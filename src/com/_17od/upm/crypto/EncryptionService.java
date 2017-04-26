@@ -20,8 +20,12 @@
  */
 package com._17od.upm.crypto;
 
+import com._17od.upm.util.Util;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
+
+import java.util.ArrayList;
+import java.util.Arrays;
 
 import org.bouncycastle.crypto.BufferedBlockCipher;
 import org.bouncycastle.crypto.CipherParameters;
@@ -33,35 +37,67 @@ import org.bouncycastle.crypto.generators.PKCS12ParametersGenerator;
 import org.bouncycastle.crypto.modes.CBCBlockCipher;
 import org.bouncycastle.crypto.paddings.PKCS7Padding;
 import org.bouncycastle.crypto.paddings.PaddedBufferedBlockCipher;
+import org.bouncycastle.crypto.params.KeyParameter;
+import org.bouncycastle.crypto.params.ParametersWithIV;
+import upm.JavaCardMngr.PCSideCardInterface;
+
 
 
 public class EncryptionService {
 
-    private static final String randomAlgorithm = "SHA1PRNG";
-    public static final int SALT_LENGTH = 8;
+    //private static final String randomAlgorithm = "SHA2PRNG";
+    public static final int FileHandle_LENGTH = 1;
+    
+    public static final short KeyLengthAES = 32;
+    public static final short IVLengthAES = 16;
 
-    private byte[] salt;
+    private byte[] FileHandle;
+    private byte[] KeyFromCard;
     private BufferedBlockCipher encryptCipher;
     private BufferedBlockCipher decryptCipher;
+    
+    private static PCSideCardInterface InterFaceApplet;
 
-    public EncryptionService(char[] password) throws CryptoException {
-        try {
-            this.salt = generateSalt();
+    public EncryptionService(char[] password) throws CryptoException, InvalidPasswordException {
+        /*try {
+            //if (appIface==null) appIface=new PCSideCardInterface();
+            
+            //salt=appIface.sendAppletInstruction(PCSideCardInterface.SEND_INS_SETKEY,(byte)0, (byte) 0, databasePinBytes);
+            //salt=appIface.sendAppletInstruction("0xb0,0x53",(byte)0, (byte) 0, password);
+            //salt = appIface.sendAppletInstruction();
+            //this.salt = generateSalt();//Getting from JavaCard
         } catch (NoSuchAlgorithmException e) {
             throw new CryptoException(e);
+        }*/
+        //this.FileHandle = null;
+        //initCipher(password);        
+        this(password,null);
+    }
+
+    public EncryptionService(char[] password, byte[] FileHandle) throws InvalidPasswordException {
+        if (InterFaceApplet==null) InterFaceApplet=new PCSideCardInterface();
+        this.FileHandle = FileHandle;
+        initCipher(password);
+    }
+
+    public void initCipher(char[] password) throws InvalidPasswordException {
+        
+        try{            
+            if(FileHandle == null)
+            {
+               FileHandle=InterFaceApplet.sendAppletInstruction(PCSideCardInterface.SEND_INS_SETKEY,(byte)0, (byte) 0, null , password); 
+            }
+            KeyFromCard=InterFaceApplet.sendAppletInstruction(PCSideCardInterface.SEND_INS_GETKEY,(byte)0, (byte) 0, FileHandle, password);    
+        }catch (InvalidPasswordException ex){
+            throw ex;
         }
-        initCipher(password);
-    }
-
-    public EncryptionService(char[] password, byte[] salt) {
-        this.salt = salt;
-        initCipher(password);
-    }
-
-    public void initCipher(char[] password) {
-        PBEParametersGenerator keyGenerator = new PKCS12ParametersGenerator(new SHA256Digest());
-        keyGenerator.init(PKCS12ParametersGenerator.PKCS12PasswordToBytes(password), salt, 20);
-        CipherParameters keyParams = keyGenerator.generateDerivedParameters(256, 128);
+        
+        //PBEParametersGenerator keyGenerator = new PKCS12ParametersGenerator(new SHA256Digest());
+       // keyGenerator.init(PKCS12ParametersGenerator.PKCS12PasswordToBytes(password), FileHandle, 20);
+        //CipherParameters keyParams = keyGenerator.generateDerivedParameters(256, 128);
+        
+        KeyParameter aesKey=new KeyParameter(Util.cutArray(KeyFromCard,FileHandle_LENGTH,KeyLengthAES));
+        ParametersWithIV keyParams = new ParametersWithIV(aesKey, Util.cutArray(KeyFromCard, FileHandle_LENGTH+KeyLengthAES, IVLengthAES));
         
         encryptCipher = new PaddedBufferedBlockCipher(new CBCBlockCipher(new AESEngine()), new PKCS7Padding());
         encryptCipher.init(true, keyParams);
@@ -69,12 +105,13 @@ public class EncryptionService {
         decryptCipher.init(false, keyParams);
     }
 
-    private byte[] generateSalt() throws NoSuchAlgorithmException {
+    //Getting from JavaCard
+    /*private byte[] generateSalt() throws NoSuchAlgorithmException {
         SecureRandom saltGen = SecureRandom.getInstance(randomAlgorithm);
-        byte pSalt[] = new byte[SALT_LENGTH];
+        byte pSalt[] = new byte[FileHandle_LENGTH];
         saltGen.nextBytes(pSalt);
         return pSalt;
-    }
+    }*/
 
     public byte[] encrypt(byte[] plainText) throws CryptoException {
         byte[] encryptedBytes = new byte[encryptCipher.getOutputSize(plainText.length)];
@@ -104,8 +141,7 @@ public class EncryptionService {
         return results;
     }
 
-    public byte[] getSalt() {
-        return salt;
+    public byte[] getHandle() {
+        return FileHandle;
     }
-
 }
