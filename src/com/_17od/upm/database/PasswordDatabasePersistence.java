@@ -80,7 +80,7 @@ public class PasswordDatabasePersistence {
      * @param password
      * @throws CryptoException
      */
-    public PasswordDatabasePersistence(char[] password) throws CryptoException {
+    public PasswordDatabasePersistence(char[] password) throws CryptoException, InvalidPasswordException {
         encryptionService = new EncryptionService(password);
     }
 
@@ -89,7 +89,7 @@ public class PasswordDatabasePersistence {
         byte[] fullDatabase = readFile(databaseFile);
 
         // Check the database is a minimum length
-        if (fullDatabase.length < EncryptionService.SALT_LENGTH) {
+        if (fullDatabase.length < EncryptionService.FileHandle_LENGTH) {
             throw new ProblemReadingDatabaseFile("This file doesn't appear to be a UPM password database");
         }
 
@@ -108,25 +108,26 @@ public class PasswordDatabasePersistence {
 
             // Calculate the positions of each item in the file
             int dbVersionPos      = header.length;
-            int saltPos           = dbVersionPos + 1;
-            int encryptedBytesPos = saltPos + EncryptionService.SALT_LENGTH;
+            int FileHandlePos           = dbVersionPos + 1;
+            int encryptedBytesPos = FileHandlePos + EncryptionService.FileHandle_LENGTH;
 
             // Get the database version 
             byte dbVersion = fullDatabase[dbVersionPos];
 
-            if (dbVersion == 2 || dbVersion == 3) {
-                byte[] salt = new byte[EncryptionService.SALT_LENGTH];
-                System.arraycopy(fullDatabase, saltPos, salt, 0, EncryptionService.SALT_LENGTH);
+            //if (dbVersion == 2 || dbVersion == 3) {
+            if (dbVersion == 3) {
+                byte[] salt = new byte[EncryptionService.FileHandle_LENGTH];
+                System.arraycopy(fullDatabase, FileHandlePos, salt, 0, EncryptionService.FileHandle_LENGTH);
                 int encryptedBytesLength = fullDatabase.length - encryptedBytesPos;
                 byte[] encryptedBytes = new byte[encryptedBytesLength]; 
                 System.arraycopy(fullDatabase, encryptedBytesPos, encryptedBytes, 0, encryptedBytesLength);
 
-                // From version 3 onwards Strings in AccountInformation are
+                /*// From version 3 onwards Strings in AccountInformation are
                 // encoded using UTF-8. To ensure we can still open older dbs
                 // we default back to the then character set, the system default
                 if (dbVersion < 3) {
                     charset = Util.defaultCharset();
-                }
+                }*/
 
                 //Attempt to decrypt the database information
                 byte[] decryptedBytes;
@@ -171,10 +172,8 @@ public class PasswordDatabasePersistence {
             // can be called. That method knows how to load old versions of the
             // db
             throw new InvalidPasswordException();
-        }
-                
+        }                
         return passwordDatabase;
-
     }
 
     public PasswordDatabase load(File databaseFile, char[] password) throws IOException, ProblemReadingDatabaseFile, InvalidPasswordException, CryptoException {
@@ -183,7 +182,7 @@ public class PasswordDatabasePersistence {
         fullDatabase = readFile(databaseFile);
 
         // Check the database is a minimum length
-        if (fullDatabase.length < EncryptionService.SALT_LENGTH) {
+        if (fullDatabase.length < EncryptionService.FileHandle_LENGTH) {
             throw new ProblemReadingDatabaseFile("This file doesn't appear to be a UPM password database");
         }
 
@@ -200,25 +199,26 @@ public class PasswordDatabasePersistence {
 
             // Calculate the positions of each item in the file
             int dbVersionPos      = header.length;
-            int saltPos           = dbVersionPos + 1;
-            int encryptedBytesPos = saltPos + EncryptionService.SALT_LENGTH;
+            int FileHandlePos           = dbVersionPos + 1;
+            int encryptedBytesPos = FileHandlePos + EncryptionService.FileHandle_LENGTH;
 
             // Get the database version 
             byte dbVersion = fullDatabase[dbVersionPos];
 
-            if (dbVersion == 2 || dbVersion == 3) {
-                byte[] salt = new byte[EncryptionService.SALT_LENGTH];
-                System.arraycopy(fullDatabase, saltPos, salt, 0, EncryptionService.SALT_LENGTH);
+            //if (dbVersion == 2 || dbVersion == 3) {
+            if (dbVersion == 3) {
+                byte[] salt = new byte[EncryptionService.FileHandle_LENGTH];
+                System.arraycopy(fullDatabase, FileHandlePos, salt, 0, EncryptionService.FileHandle_LENGTH);
                 int encryptedBytesLength = fullDatabase.length - encryptedBytesPos;
                 byte[] encryptedBytes = new byte[encryptedBytesLength]; 
                 System.arraycopy(fullDatabase, encryptedBytesPos, encryptedBytes, 0, encryptedBytesLength);
 
-                // From version 3 onwards Strings in AccountInformation are
+                /*// From version 3 onwards Strings in AccountInformation are
                 // encoded using UTF-8. To ensure we can still open older dbs
                 // we default back to the then character set, the system default
                 if (dbVersion < 3) {
                     charset = Util.defaultCharset();
-                }
+                }*/
 
                 //Attempt to decrypt the database information
                 encryptionService = new EncryptionService(password, salt);
@@ -239,7 +239,9 @@ public class PasswordDatabasePersistence {
 
         } else {
             
-            // This might be an old database (pre version 2) so try loading it using the old database format
+            throw new ProblemReadingDatabaseFile("This file doesn't appear to be a UPM password database");
+            
+/*            // This might be an old database (pre version 2) so try loading it using the old database format
             
             // Check the database is a minimum length
             if (fullDatabase.length < EncryptionService.SALT_LENGTH) {
@@ -278,7 +280,7 @@ public class PasswordDatabasePersistence {
             }
 
             // Initialise the EncryptionService so that it's ready for the "save" operation
-            encryptionService = new EncryptionService(password);
+            encryptionService = new EncryptionService(password);*/
 
         }
         
@@ -324,7 +326,8 @@ public class PasswordDatabasePersistence {
         FileOutputStream fos = new FileOutputStream(database.getDatabaseFile());
         fos.write(FILE_HEADER.getBytes());
         fos.write(DB_VERSION);
-        fos.write(encryptionService.getSalt());
+        //fos.write(encryptionService.getSalt());
+        fos.write(encryptionService.getHandle());
         fos.write(encryptedData);
         fos.close();
     }
