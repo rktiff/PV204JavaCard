@@ -39,10 +39,10 @@ public class SimpleApplet extends javacard.framework.Applet
     final static byte NOOFDB                        =  (byte) 4;
     final static byte PINLEN                       = (byte) 16;
     
-    final static byte KEY_SIZE                      = (byte) 32;
+    final static byte KEYSIZE                      = (byte) 32;
 
    private   byte           NumKey = 0;
-   private   byte           DBID = 0; 
+ 
    private   RandomData     m_secureRandom = null;
    private   MessageDigest  m_hash = null;
    private   AESKey         m_aesLongKey = null;
@@ -61,9 +61,8 @@ public class SimpleApplet extends javacard.framework.Applet
 
   
 
-    private   AESKey[]         KeyArray = new AESKey[NOOFDB];
-    //private   AESKey[]         IVArray = new AESKey[NOOFDB];
-    private   OwnerPIN[]       PINArray = new OwnerPIN[NOOFDB];
+    private   AESKey[]         KeyOfArray = new AESKey[NOOFDB];
+    private   OwnerPIN[]       PwdArray = new OwnerPIN[NOOFDB];
 
     /**
      * SimpleApplet default constructor
@@ -92,68 +91,16 @@ public class SimpleApplet extends javacard.framework.Applet
             	   
             for(short i=0; i<NOOFDB; i++) 
  	    {
-		PINArray[i] = new OwnerPIN((byte) 3, PINLEN);
+		PwdArray[i] = new OwnerPIN((byte) 3, PINLEN);
 	    }
 
             for(short i=0; i<NOOFDB; i++) 
             {
-                KeyArray[i] = (AESKey) KeyBuilder.buildKey(KeyBuilder.TYPE_AES, KeyBuilder.LENGTH_AES_256, false);
+                KeyOfArray[i] = (AESKey) KeyBuilder.buildKey(KeyBuilder.TYPE_AES, KeyBuilder.LENGTH_AES_256, false);
             }
-	    /*for(short i=0; i<NOOFDB; i++) {
-                IVArray[i] = (AESKey) KeyBuilder.buildKey(KeyBuilder.TYPE_AES, KeyBuilder.LENGTH_AES_256, false);
-                }*/
+	    
             
             register();
-        
-        // data offset is used for application specific parameter.
-        // initialization with default offset (AID offset).
-        /*short dataOffset = offset;
-        boolean isOP2 = false;
-
-        if(length > 9) {
-            // Install parameter detail. Compliant with OP 2.0.1.
-
-            // | size | content
-            // |------|---------------------------
-            // |  1   | [AID_Length]
-            // | 5-16 | [AID_Bytes]
-            // |  1   | [Privilege_Length]
-            // | 1-n  | [Privilege_Bytes] (normally 1Byte)
-            // |  1   | [Application_Proprietary_Length]
-            // | 0-m  | [Application_Proprietary_Bytes]
-
-            // shift to privilege offset
-            dataOffset += (short)( 1 + buffer[offset]);
-            // finally shift to Application specific offset
-            dataOffset += (short)( 1 + buffer[dataOffset]);
-
-            // go to proprietary data
-            dataOffset++;          
-
-
-	    // CREATE RANDOM DATA GENERATORS
-            m_secureRandom = RandomData.getInstance(RandomData.ALG_SECURE_RANDOM);             
-	   
-            for(short i=0; i<DB_CNT; i++) 
- 	    {
-		PINArray[i] = new OwnerPIN((byte) 3, PIN_LEN);
-	    }
-
-            for(short i=0; i<DB_CNT; i++) KeyArray[i] = (AESKey) KeyBuilder.buildKey(KeyBuilder.TYPE_AES, KeyBuilder.LENGTH_AES_256, false);
-	    for(short i=0; i<DB_CNT; i++) IVArray[i] = (AESKey) KeyBuilder.buildKey(KeyBuilder.TYPE_AES, KeyBuilder.LENGTH_AES_256, false);
-
-            isOP2 = true;
-
-        } else {
-           // <IF NECESSARY, USE COMMENTS TO CHECK LENGTH >
-           // if(length != <PUT YOUR PARAMETERS LENGTH> )
-           //     ISOException.throwIt((short)(ISO7816.SW_WRONG_LENGTH + length));
-       }
-
-        // <PUT YOUR CREATION ACTION HERE>
-
-        // register this instance
-          register();*/
     }
 
     /**
@@ -211,8 +158,8 @@ public class SimpleApplet extends javacard.framework.Applet
                 switch ( apduBuffer[ISO7816.OFFSET_INS] )
                 {
                     case INS_GENKEY: GenKey(apdu); break;     
-                    case INS_SETKEY: SetKey(apdu); break;                    
-		    case INS_GETKEY: GetKey(apdu); break; 
+                    case INS_SETKEY: SetHandleAndKey(apdu); break;                    
+		    case INS_GETKEY: GetKeyFromHandle(apdu); break; 
                     case INS_N_1: GetN_1(apdu); break; 
                     case INS_N_B: GetN_B(apdu); break; 
                     default :
@@ -250,50 +197,7 @@ public class SimpleApplet extends javacard.framework.Applet
             ISOException.throwIt(SW_Exception);
         }
         
-    }
-    
-    
-    /*void GenKey(APDU apdu)
-    {
-        byte[]    apdubuf = apdu.getBuffer();
-        byte[]    Temp = new byte[20];
-        byte[]    res = new byte[16];
-        short     dataLen = apdu.setIncomingAndReceive();
-        
-        
-        Util.arrayCopyNonAtomic(AdminPin, (short) 0, Temp, (short) 0,  (short) AdminPin.length);
-        Util.arrayCopyNonAtomic(apdubuf, (short) 0, Temp, (short) 0,  (short) AdminPin.length);
-        
-        
-        //Doing HASH
-        //Calculating the HASH on above buffer
-        if (m_hash != null) {
-            m_hash.doFinal(apdubuf, ISO7816.OFFSET_CDATA, dataLen, Temp, (short) 0);
-            
-            for(short i = 0; i < 1000; i++)
-            {
-                m_hash.doFinal(Temp, (short) 0, (short) Temp.length, Temp, (short) 0);
-            }
-            
-            m_hash.doFinal(Temp, (short) 0, (short) Temp.length, Temp, (short) 0);
-            
-        }
-        
-        Util.arrayCopyNonAtomic(Temp, (short) 0, LongKey, (short) 0,  (short) 16);
-
-        // SET KEY VALUE
-            m_aesLongKey.setKey(LongKey, (short) 0);
-
-            // INIT CIPHERS WITH NEW KEY
-            m_encryptCipher.init(m_aesLongKey, Cipher.MODE_ENCRYPT);
-            
-            //byte[] ptdata = "123456789abcdefg".getBytes();
-
-            //m_encryptCipher.doFinal(ptdata, (short) 0, (short) 16, res, (short) 0);
-            
-        
-            //System.out.println(res);
-    }*/
+    }  
     
     void GenKey(APDU apdu)
     {
@@ -303,7 +207,7 @@ public class SimpleApplet extends javacard.framework.Applet
         short     dataLen = apdu.setIncomingAndReceive();
         
         //Doing HASH
-        //Calculating the HASH on above buffer
+        //Calculating the HASH 
         if (m_hash != null) {
             m_hash.doFinal(apdubuf, ISO7816.OFFSET_CDATA, dataLen, Temp, (short) 0);
             
@@ -319,17 +223,17 @@ public class SimpleApplet extends javacard.framework.Applet
         Util.arrayCopyNonAtomic(Temp, (short) 0, LongKey, (short) 0,  (short) 16);
 
         // SET KEY VALUE
-            m_aesLongKey.setKey(LongKey, (short) 0);
+        m_aesLongKey.setKey(LongKey, (short) 0);
 
-            // INIT CIPHERS WITH NEW KEY
-            m_encryptCipher.init(m_aesLongKey, Cipher.MODE_ENCRYPT);
+        // INIT CIPHERS WITH NEW KEY
+        m_encryptCipher.init(m_aesLongKey, Cipher.MODE_ENCRYPT);
             
-            //byte[] ptdata = "123456789abcdefg".getBytes();
+        //byte[] ptdata = "123456789abcdefg".getBytes();
 
-            //m_encryptCipher.doFinal(ptdata, (short) 0, (short) 16, res, (short) 0);
+        //m_encryptCipher.doFinal(ptdata, (short) 0, (short) 16, res, (short) 0);
             
         
-            //System.out.println(res);
+        //System.out.println(res);
     }
     
     void GetN_1(APDU apdu)
@@ -392,32 +296,24 @@ public class SimpleApplet extends javacard.framework.Applet
     }
 
     // SET the KEY
-    void SetKey(APDU apdu) 
+    void SetHandleAndKey(APDU apdu) 
     {
       byte[]    apdubuf = apdu.getBuffer();
       short     dataLen = apdu.setIncomingAndReceive();
       
-      byte[]    RandomNumber = new byte[2*KEY_SIZE];
-      m_secureRandom.generateData(RandomNumber, (byte)0, (byte) (2*KEY_SIZE));
-      
-      /*// SET KEY VALUE
-      m_aesSessionKey.setKey(SessionKey, (short) 0);
-
-      // INIT CIPHERS WITH NEW KEY
-      m_encryptSKCipher.init(m_aesSessionKey, Cipher.MODE_ENCRYPT);
+      byte[]    RandomNumber = new byte[2*KEYSIZE];
+      m_secureRandom.generateData(RandomNumber, (byte)0, (byte) (2*KEYSIZE));
             
-      m_encryptSKCipher.doFinal(RandomNumber, (short) 0, (short) (2*KEY_SIZE), RandomNumber, (short) 0);      
-      */
-      KeyArray[NumKey].setKey(RandomNumber, (byte)0);  
-      //IVArray[NumKey].setKey(RandomNumber, KEY_SIZE);   
-      PINArray[NumKey].update(apdubuf,ISO7816.OFFSET_CDATA, (byte)dataLen);
+      KeyOfArray[NumKey].setKey(RandomNumber, (byte)0);  
+         
+      PwdArray[NumKey].update(apdubuf,ISO7816.OFFSET_CDATA, (byte)dataLen);
       NumKey++;
       //Handle
       apdubuf[ISO7816.OFFSET_CDATA] = (byte)(NumKey-1);
       apdu.setOutgoingAndSend(ISO7816.OFFSET_CDATA, (byte)1);
     }
 
-    void GetKey(APDU apdu) 
+    void GetKeyFromHandle(APDU apdu) 
     {
       byte[]    apdubuf = apdu.getBuffer();
       short     dataLen = apdu.setIncomingAndReceive();
@@ -428,7 +324,7 @@ public class SimpleApplet extends javacard.framework.Applet
       
       if(Handle < NumKey)
       {
-        if (PINArray[Handle].check(apdubuf, (byte)(ISO7816.OFFSET_CDATA+1), (byte) (dataLen-1)) == true)
+        if (PwdArray[Handle].check(apdubuf, (byte)(ISO7816.OFFSET_CDATA+1), (byte) (dataLen-1)) == true)
         {
             FlagMatch = 1;                  
         }
@@ -441,25 +337,21 @@ public class SimpleApplet extends javacard.framework.Applet
       else ISOException.throwIt(SW_BAD_Handle);
       
       if(FlagMatch==1) 
-      {
-              //DBID = (byte)j;
+      {              
               apdubuf[ISO7816.OFFSET_CDATA] = Handle;
-              KeyArray[Handle].getKey(Temp, (byte)0);
-              
-              //IVArray[Handle].getKey(Temp, (byte)32);
+              KeyOfArray[Handle].getKey(Temp, (byte)0);
               
               // SET KEY VALUE
               m_aesSessionKey.setKey(SessionKey, (short) 0);
 
               // INIT CIPHERS WITH NEW KEY
-              m_encryptSKCipher.init(m_aesSessionKey, Cipher.MODE_ENCRYPT);
-            
-              //m_encryptSKCipher.doFinal(Temp, (short) 0, (short) (2*KEY_SIZE), Temp, (short) 0);      
-              m_encryptSKCipher.doFinal(Temp, (short) 0, (short) (KEY_SIZE), Temp, (short) 0);      
+              m_encryptSKCipher.init(m_aesSessionKey, Cipher.MODE_ENCRYPT);           
               
-              Util.arrayCopyNonAtomic(Temp, (short) 0, apdubuf, (short) (ISO7816.OFFSET_CDATA + 1), (short) (KEY_SIZE) );
+              m_encryptSKCipher.doFinal(Temp, (short) 0, (short) (KEYSIZE), Temp, (short) 0);      
+              
+              Util.arrayCopyNonAtomic(Temp, (short) 0, apdubuf, (short) (ISO7816.OFFSET_CDATA + 1), (short) (KEYSIZE) );
 
-              apdu.setOutgoingAndSend(ISO7816.OFFSET_CDATA, (byte)(1+KEY_SIZE));
+              apdu.setOutgoingAndSend(ISO7816.OFFSET_CDATA, (byte)(1+KEYSIZE));
               
               return;
       }

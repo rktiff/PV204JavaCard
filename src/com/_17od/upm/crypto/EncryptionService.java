@@ -82,7 +82,7 @@ private static final String randomAlgorithm = "SHA1PRNG";
     Cipher cipher;
     Cipher SKcipher;
     
-    //private byte AdminPin[] = {(byte) 0x4C, (byte) 0x61, (byte) 0x62, 0x3D};
+    private byte AdminPin[] = {(byte) 0x4C, (byte) 0x61, (byte) 0x62, 0x3D};
     
     private MainWindow mainWindow;
 
@@ -127,12 +127,25 @@ private static final String randomAlgorithm = "SHA1PRNG";
            byte[] res1 = new byte[48]; 
            cipher.doFinal(ResponseFromCard, 0, 48, res1, 0);
            
+           //Copying Nounce_PC
+           byte[] res2 = new byte[16]; 
+           System.arraycopy(res1, 0 , res2, 0, 16);
+           
+           for(short i =0 ; i < N_1.length; i++ )
+           {
+               if(res2[i] != N_1[i])
+               {
+                   //If Nounce_PC is not matching throw error
+                   /*throw exception*/ 
+                   JOptionPane.showMessageDialog(mainWindow, Translator.translate("SecureChProblem"));
+                   System.exit(0);
+               }
+           }
+           
            //Copying Nounce_Card
            System.arraycopy(res1, 16 , N_B, 0, 16);
             
-           cipher.init(Cipher.ENCRYPT_MODE, secretKeySpec);           
-           
-           byte[] res2 = new byte[16]; 
+           cipher.init(Cipher.ENCRYPT_MODE, secretKeySpec);
 
            cipher.doFinal(N_B, 0, 16, res2, 0);
            
@@ -141,7 +154,7 @@ private static final String randomAlgorithm = "SHA1PRNG";
            //Checking response from card for Nounce_Card
            if(ResponseFromCard == null)
            {
-               //If Nounce_Card not matching throw error
+               //If Nounce_Card is not matching throw error
                /*throw exception*/ 
                JOptionPane.showMessageDialog(mainWindow, Translator.translate("SecureChProblem"));
                System.exit(0);
@@ -180,8 +193,7 @@ private static final String randomAlgorithm = "SHA1PRNG";
             throw ex;
         }
         
-        //Encryption/Decryption operation
-        
+        //Encryption/Decryption operation        
         KeyParameter keyParams = new KeyParameter(Util.cutArray(KeyFromCard,FileHandle_LENGTH,KeyLengthAES));
         
         encryptCipher = new PaddedBufferedBlockCipher(new CBCBlockCipher(new AESEngine()), new PKCS7Padding());
