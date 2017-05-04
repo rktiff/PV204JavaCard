@@ -11,6 +11,7 @@ import com._17od.upm.util.Util;
 import java.nio.charset.Charset;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import javax.smartcardio.ResponseAPDU;
 
 /**
  *
@@ -23,6 +24,10 @@ public class PCSideCardInterface {
     private static byte APPLET_AID[] = {
         (byte) 0x4C, (byte) 0x61, (byte) 0x62, (byte) 0x61, (byte) 0x6B, (byte) 0x41, (byte) 0x70, (byte) 0x70, (byte) 0x6C, (byte) 0x65, (byte) 0x74};
     
+    private static byte SELECT_SIMPLEAPPLET[] = {(byte) 0x00, (byte) 0xa4, (byte) 0x04, (byte) 0x00, (byte) 0x0b, 
+        (byte) 0x73, (byte) 0x69, (byte) 0x6D, (byte) 0x70, (byte) 0x6C,
+        (byte) 0x65, (byte) 0x61, (byte) 0x70, (byte) 0x70, (byte) 0x6C, (byte) 0x65, (byte) 0x74};
+    
     public final static byte EMPTY[] = {};
     
     public final static byte SEND_INS_GETKEY[]                = {(byte) 0xB0, (byte) 0x53};
@@ -31,14 +36,25 @@ public class PCSideCardInterface {
     final static short OK                               = (short) 0x9000;
     final static short SW_BAD_PIN                       = (short) 0x6900;
     
-    public PCSideCardInterface() {
-        // Init card simulator
-        // byte[] installData = new byte[10]; // no special install data passed now - can be used to pass initial PIN, PUK etc.
-        cardMngr.prepareLocalSimulatorApplet(APPLET_AID, EMPTY, SimpleApplet.class);
+    public static final int FileHandle_LENGTH = 1;
     
-        // Init real card
-        // TODO real card
+    public PCSideCardInterface() throws Exception {
         
+        // Init real card 
+        try{                
+            if (cardMngr.ConnectToCard())//Real Card
+            {
+                        // Select our application on card
+                         cardMngr.sendAPDU(SELECT_SIMPLEAPPLET);//Real Card
+            }
+        }
+        catch (Exception ex)
+        {
+            System.out.println("Exception : " + ex);
+        }
+        
+        // Init card simulator
+        //cardMngr.prepareLocalSimulatorApplet(APPLET_AID, EMPTY, SimpleApplet.class);
     }
     
     //Method used to construct APDU with instruction and optional additional data, send it and receive response
@@ -57,9 +73,15 @@ public class PCSideCardInterface {
         try {
             // TODO real card
             // TODO parse correct answers and error
-            byte[] response = cardMngr.sendAPDUSimulator(apdu);
-          
-            return response;
+            
+            // Init card simulator
+            //byte[] response = cardMngr.sendAPDUSimulator(apdu);          
+            //return response;
+            
+            //For Real Card
+            ResponseAPDU output = cardMngr.sendAPDU(apdu);//Real Card
+            byte[] ResponseText = output.getBytes();
+            return ResponseText;
 
         } catch (Exception ex) {
             System.out.println("Exception : " + ex);
@@ -93,7 +115,7 @@ public class PCSideCardInterface {
     public byte[] sendAppletInstruction(byte[] instruction, byte P1, byte P2, byte[] Handle, char[] password) throws InvalidPasswordException{
     
     byte[] databasePinBytes = new String(password).getBytes(Charset.forName("UTF-8"));
-    byte[] additionalData = new byte[1+databasePinBytes.length];
+    byte[] additionalData = new byte[FileHandle_LENGTH + databasePinBytes.length];
     
     if(Handle == null)
     {
