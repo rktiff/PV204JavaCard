@@ -55,9 +55,11 @@ public class SimpleApplet extends javacard.framework.Applet
    
    private byte[] LongKey = new byte[16];
    private byte[] SessionKey = new byte[16];
+   private byte AdminPin[] = {(byte) 0x4C, (byte) 0x61, (byte) 0x62, 0x3D};
    byte[]    N_B = new byte[16];
    byte[]    resN_1 = new byte[16];
 
+  
 
     private   AESKey[]         KeyArray = new AESKey[NOOFDB];
     private   AESKey[]         IVArray = new AESKey[NOOFDB];
@@ -250,6 +252,48 @@ public class SimpleApplet extends javacard.framework.Applet
         
     }
     
+    
+    /*void GenKey(APDU apdu)
+    {
+        byte[]    apdubuf = apdu.getBuffer();
+        byte[]    Temp = new byte[20];
+        byte[]    res = new byte[16];
+        short     dataLen = apdu.setIncomingAndReceive();
+        
+        
+        Util.arrayCopyNonAtomic(AdminPin, (short) 0, Temp, (short) 0,  (short) AdminPin.length);
+        Util.arrayCopyNonAtomic(apdubuf, (short) 0, Temp, (short) 0,  (short) AdminPin.length);
+        
+        
+        //Doing HASH
+        //Calculating the HASH on above buffer
+        if (m_hash != null) {
+            m_hash.doFinal(apdubuf, ISO7816.OFFSET_CDATA, dataLen, Temp, (short) 0);
+            
+            for(short i = 0; i < 1000; i++)
+            {
+                m_hash.doFinal(Temp, (short) 0, (short) Temp.length, Temp, (short) 0);
+            }
+            
+            m_hash.doFinal(Temp, (short) 0, (short) Temp.length, Temp, (short) 0);
+            
+        }
+        
+        Util.arrayCopyNonAtomic(Temp, (short) 0, LongKey, (short) 0,  (short) 16);
+
+        // SET KEY VALUE
+            m_aesLongKey.setKey(LongKey, (short) 0);
+
+            // INIT CIPHERS WITH NEW KEY
+            m_encryptCipher.init(m_aesLongKey, Cipher.MODE_ENCRYPT);
+            
+            //byte[] ptdata = "123456789abcdefg".getBytes();
+
+            //m_encryptCipher.doFinal(ptdata, (short) 0, (short) 16, res, (short) 0);
+            
+        
+            //System.out.println(res);
+    }*/
     
     void GenKey(APDU apdu)
     {

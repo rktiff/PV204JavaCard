@@ -82,6 +82,8 @@ private static final String randomAlgorithm = "SHA1PRNG";
     Cipher cipher;
     Cipher SKcipher;
     
+    //private byte AdminPin[] = {(byte) 0x4C, (byte) 0x61, (byte) 0x62, 0x3D};
+    
     private MainWindow mainWindow;
 
     public EncryptionService(char[] password) throws CryptoException, InvalidPasswordException, Exception {
@@ -99,6 +101,7 @@ private static final String randomAlgorithm = "SHA1PRNG";
         try{
             //Establishing Secure Channel
             SecureChannel(password);
+            //SecureChannel();
             
             //Asking Card to be ready with Symm Key
             byte[] Data = new byte[password.length + salt.length];
@@ -178,10 +181,11 @@ private static final String randomAlgorithm = "SHA1PRNG";
         }
         
         //Encryption/Decryption operation
-        KeyParameter aesKey=new KeyParameter(Util.cutArray(KeyFromCard,FileHandle_LENGTH,KeyLengthAES));
-        ParametersWithIV keyParams = new ParametersWithIV(aesKey, Util.cutArray(KeyFromCard, FileHandle_LENGTH+KeyLengthAES, IVLengthAES));
+        //KeyParameter aesKey=new KeyParameter(Util.cutArray(KeyFromCard,FileHandle_LENGTH,KeyLengthAES));
+        //ParametersWithIV keyParams = new ParametersWithIV(aesKey, Util.cutArray(KeyFromCard, FileHandle_LENGTH+KeyLengthAES, IVLengthAES));
         
-        //CipherParameters keyParams = new KeyParameter(aesKey, Util.cutArray(KeyFromCard,FileHandle_LENGTH,KeyLengthAES));
+        KeyParameter keyParams = new KeyParameter(Util.cutArray(KeyFromCard,FileHandle_LENGTH,KeyLengthAES));
+        
         encryptCipher = new PaddedBufferedBlockCipher(new CBCBlockCipher(new AESEngine()), new PKCS7Padding());
         encryptCipher.init(true, keyParams);
         decryptCipher = new PaddedBufferedBlockCipher(new CBCBlockCipher(new AESEngine()), new PKCS7Padding());
@@ -229,6 +233,7 @@ private static final String randomAlgorithm = "SHA1PRNG";
     }
 
     private void SecureChannel(char[] password) throws NoSuchAlgorithmException, NoSuchPaddingException, InvalidKeyException, IllegalBlockSizeException, BadPaddingException, ShortBufferException {
+    //private void SecureChannel() throws NoSuchAlgorithmException, NoSuchPaddingException, InvalidKeyException, IllegalBlockSizeException, BadPaddingException, ShortBufferException {
         
         //Generating Salt
         salt = generateSalt();
@@ -240,7 +245,7 @@ private static final String randomAlgorithm = "SHA1PRNG";
         System.arraycopy(password.toString().getBytes(), 0, Temp, 0, password.length);
         System.arraycopy(salt, 0, Temp, password.length, salt.length);
         
-        //Long Key using PBKDF using 100 HASH(password || salt)
+        //Long Key using PBKDF using 1000 HASH(password || salt)
         MessageDigest sha = MessageDigest.getInstance("SHA-1");        
         //LongKey = Arrays.copyOf(sha.digest(Temp), 16);
         LongKey = Arrays.copyOf(sha.digest(Temp), 20);
