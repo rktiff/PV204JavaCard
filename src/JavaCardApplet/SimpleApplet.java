@@ -36,13 +36,13 @@ public class SimpleApplet extends javacard.framework.Applet
     final static short SW_TransactionException_prefix   = (short) 0xf400;
     final static short SW_CardRuntimeException_prefix   = (short) 0xf500;
 
-    final static byte DB_CNT                        =  (byte) 4;
+    final static byte NOOFDB                        =  (byte) 4;
     final static byte PIN_LEN                       = (byte) 16;
     final static byte IV_SIZE                       = (byte) 16;
     final static byte KEY_SIZE                      = (byte) 32;
 
    private   byte           NumKey = 0;
-    private   byte           DBID = 0; 
+   private   byte           DBID = 0; 
    private   RandomData     m_secureRandom = null;
    private   MessageDigest  m_hash = null;
    private   AESKey         m_aesLongKey = null;
@@ -59,9 +59,9 @@ public class SimpleApplet extends javacard.framework.Applet
    byte[]    resN_1 = new byte[16];
 
 
-    private   AESKey[]         KeyArray = new AESKey[DB_CNT];
-    private   AESKey[]         IVArray = new AESKey[DB_CNT];
-    private   OwnerPIN[]       PINArray = new OwnerPIN[DB_CNT];
+    private   AESKey[]         KeyArray = new AESKey[NOOFDB];
+    private   AESKey[]         IVArray = new AESKey[NOOFDB];
+    private   OwnerPIN[]       PINArray = new OwnerPIN[NOOFDB];
 
     /**
      * SimpleApplet default constructor
@@ -88,13 +88,18 @@ public class SimpleApplet extends javacard.framework.Applet
             m_encryptSKCipher = Cipher.getInstance(Cipher.ALG_AES_BLOCK_128_ECB_NOPAD, false);
             m_decryptSKCipher = Cipher.getInstance(Cipher.ALG_AES_BLOCK_128_ECB_NOPAD, false);
             	   
-            for(short i=0; i<DB_CNT; i++) 
+            for(short i=0; i<NOOFDB; i++) 
  	    {
 		PINArray[i] = new OwnerPIN((byte) 3, PIN_LEN);
 	    }
 
-            for(short i=0; i<DB_CNT; i++) KeyArray[i] = (AESKey) KeyBuilder.buildKey(KeyBuilder.TYPE_AES, KeyBuilder.LENGTH_AES_256, false);
-	    for(short i=0; i<DB_CNT; i++) IVArray[i] = (AESKey) KeyBuilder.buildKey(KeyBuilder.TYPE_AES, KeyBuilder.LENGTH_AES_256, false);
+            for(short i=0; i<NOOFDB; i++) 
+            {
+                KeyArray[i] = (AESKey) KeyBuilder.buildKey(KeyBuilder.TYPE_AES, KeyBuilder.LENGTH_AES_256, false);
+            }
+	    for(short i=0; i<NOOFDB; i++) {
+                IVArray[i] = (AESKey) KeyBuilder.buildKey(KeyBuilder.TYPE_AES, KeyBuilder.LENGTH_AES_256, false);
+                }
             
             register();
         
@@ -257,6 +262,14 @@ public class SimpleApplet extends javacard.framework.Applet
         //Calculating the HASH on above buffer
         if (m_hash != null) {
             m_hash.doFinal(apdubuf, ISO7816.OFFSET_CDATA, dataLen, Temp, (short) 0);
+            
+            for(short i = 0; i < 1000; i++)
+            {
+                m_hash.doFinal(Temp, (short) 0, (short) Temp.length, Temp, (short) 0);
+            }
+            
+            m_hash.doFinal(Temp, (short) 0, (short) Temp.length, Temp, (short) 0);
+            
         }
         
         Util.arrayCopyNonAtomic(Temp, (short) 0, LongKey, (short) 0,  (short) 16);

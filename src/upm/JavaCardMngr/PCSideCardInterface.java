@@ -36,15 +36,14 @@ public class PCSideCardInterface {
     public final static byte SEND_INS_N_1[]                = {(byte) 0xB0, (byte) 0x51};
     public final static byte SEND_INS_N_B[]                = {(byte) 0xB0, (byte) 0x54};
     
-    final static short OK                               = (short) 0x9000;
-    final static short SW_BAD_PIN                       = (short) 0x6900;
+    final static short OK                               = (short) 0x9000;   
     
     public static final int FileHandle_LENGTH = 1;
     
     public PCSideCardInterface() throws Exception {
         
         // Init real card 
-        try{                
+        /*try{                
             if (cardMngr.ConnectToCard())//Real Card
             {
                         // Select our application on card
@@ -54,15 +53,14 @@ public class PCSideCardInterface {
         catch (Exception ex)
         {
             System.out.println("Exception : " + ex);
-        }
+        }*/
         
         // Init card simulator
-        //cardMngr.prepareLocalSimulatorApplet(APPLET_AID, EMPTY, SimpleApplet.class);
-    }
+        cardMngr.prepareLocalSimulatorApplet(APPLET_AID, EMPTY, SimpleApplet.class);
+    }    
     
-    //Method used to construct APDU with instruction and optional additional data, send it and receive response
-    //public byte[] sendApduAndReceive(byte[] instruction, byte P1, byte P2, byte[] additionalData)  {
-    public byte[] sendApduAndReceive(byte[] instruction, byte P1, byte P2,byte[] additionalData) {
+    //Send and Receive APDU
+    public byte[] SendandReceiveApdu(byte[] instruction, byte P1, byte P2,byte[] additionalData) {
         
         short additionalDataLen = (short) additionalData.length;
         byte apdu[] = new byte[CardMngr.HEADER_LENGTH + additionalDataLen];
@@ -74,17 +72,15 @@ public class PCSideCardInterface {
         if(additionalDataLen>0)
             System.arraycopy(additionalData,0,apdu, CardMngr.OFFSET_DATA,additionalDataLen);
         try {
-            // TODO real card
-            // TODO parse correct answers and error
             
             // Init card simulator
-            /*byte[] response = cardMngr.sendAPDUSimulator(apdu);          
-            return response;*/
+            byte[] response = cardMngr.sendAPDUSimulator(apdu);          
+            return response;
             
             //For Real Card
-            ResponseAPDU output = cardMngr.sendAPDU(apdu);//Real Card
+            /*ResponseAPDU output = cardMngr.sendAPDU(apdu);//Real Card
             byte[] ResponseText = output.getBytes();
-            return ResponseText;
+            return ResponseText;*/
 
         } catch (Exception ex) {
             System.out.println("Exception : " + ex);
@@ -92,47 +88,36 @@ public class PCSideCardInterface {
         return null;
     } 
     
-    private boolean parseStatusWord(byte[] status, int arraylength) throws InvalidPasswordException{
-        if(arraylength!=2) return false;
+    //Parsing the Status received from Card
+    private boolean ParseStatus(byte[] response, int responselength) throws InvalidPasswordException{
         
-//        short[] shortstatus=new short[2];
-//        for (int i=0;i<2;i++) shortstatus[i]=(short)(status[i]& 0xff);
-//        System.out.println(0x100 * shortstatus[0] + shortstatus[1]);
-//      switch((short)(0x100 * shortstatus[0] + shortstatus[1])){
-////        switch((short)i){
-//            case OK: return true; break;
-//            case SW_BAD_PIN: throw new SmartUPMAppletException ("PIN was not accepted."); break;
-//            default: throw new SmartUPMAppletException ("Unexpected response from applet."); break;
-//        }
-        
-        short shortstatus= (short) ((short)0x100 * (short)(status[0]& 0xff) + (short)(status[1]& 0xff));
-        if(shortstatus==OK){
-            return true;
+        //Card response length has to be 2
+        if(responselength == 2)
+        {
+            short shortstatus= (short) ((short)0x100 * (short)(response[0]& 0xff) + (short)(response[1]& 0xff));
+            if(shortstatus==OK)
+            {
+                return true;
+            }        
+            else throw new InvalidPasswordException();
         }
-        /*/else if (shortstatus==SW_BAD_PIN){
-            throw new InvalidPasswordException();
-        }*/
-        else throw new InvalidPasswordException();
+        else return false;
     }
     
-    public byte[] sendAppletInstructionSecureChannel (byte[] instruction, byte P1, byte P2, byte[] data) throws Exception
+    //SendAppletIns for Secure Channel
+    public byte[] SendAppletInstructionSecureChannel (byte[] instruction, byte P1, byte P2, byte[] data) throws Exception
     {
-        //byte[] databasePinBytes = new String(password).getBytes(Charset.forName("UTF-8"));
         byte[] additionalData = new byte[data.length];
     
-    
-        //System.arraycopy(password.toString().getBytes(), 0, additionalData, 0, password.length);
         System.arraycopy(data, 0, additionalData, 0, data.length);
         
         try{
             byte[] result=null;
-            byte[] response=sendApduAndReceive(instruction, P1, P2, additionalData);
-
-            //if(response.length<2) throw new SmartUPMAppletException("Unexpected Applet Response.");
-
-            //Applet response is at least 2 bytes, last 2 bytes are status word.
+            byte[] response=SendandReceiveApdu(instruction, P1, P2, additionalData);   
             
-            if(response.length>2){
+            //The response has to be atleast 2 bytes long
+            if(response.length > 2)
+            {
                 result=new byte[response.length-2];
                 System.arraycopy(response,0,result,0,result.length);
             }
@@ -141,59 +126,51 @@ public class PCSideCardInterface {
                 result=new byte[response.length];
                 System.arraycopy(response,0,result,0,result.length);
             }
+            
             byte status[]=new byte[2];
             System.arraycopy(response,response.length-2,status,0,2);
             
-            if (parseStatusWord(status, status.length)) return result;
+            if (ParseStatus(status, status.length)) return result;
             else return null;
-            
-            /*if( (status[0] == 0x90) && (status[1] == 0x0) )
-                return result;
-            else return null; */           
         }
         catch(Exception ex){
             throw ex;
         }
     }    
     
-    public byte[] sendAppletInstruction(byte[] instruction, byte P1, byte P2, byte[] Handle, char[] password) throws InvalidPasswordException{
+    //SendApplet Instruction 
+    public byte[] SendAppletInstruction(byte[] instruction, byte P1, byte P2, byte[] Handle, char[] password) throws InvalidPasswordException{
     
     byte[] databasePinBytes = new String(password).getBytes(Charset.forName("UTF-8"));
     byte[] additionalData = new byte[FileHandle_LENGTH + databasePinBytes.length];
     
+    //For new database
     if(Handle == null)
     {
         additionalData = databasePinBytes;
-    }
-    else
-    {        
-        //additionalData = Util.mergeArrays(Handle,databasePinBytes);      
+    }   
+    else //for opening existing database
+    {   
         additionalData[0] = (byte) Handle[0];
         for(short i=0;i<databasePinBytes.length;i++)
             additionalData[i+1] = databasePinBytes[i];
     }
         
-        try{
+    try{
             byte[] result=null;
-            byte[] response=sendApduAndReceive(instruction, P1, P2, additionalData);
-
-            //if(response.length<2) throw new SmartUPMAppletException("Unexpected Applet Response.");
-
-            //Applet response is at least 2 bytes, last 2 bytes are status word.
-
-            if(response.length>2){
+            byte[] response=SendandReceiveApdu(instruction, P1, P2, additionalData);
+        
+            //The response has to be atleast 2 bytes long
+            if(response.length > 2)
+            {
                 result=new byte[response.length-2];
                 System.arraycopy(response,0,result,0,result.length);
             }
             byte status[]=new byte[2];
             System.arraycopy(response,response.length-2,status,0,2);
             
-            if (parseStatusWord(status, status.length)) return result;
+            if (ParseStatus(status, status.length)) return result;
             else return null;
-            
-            /*if( (status[0] == 0x90) && (status[1] == 0x0) )
-                return result;
-            else return null; */           
         }
         catch(Exception ex){
             throw ex;

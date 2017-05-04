@@ -97,15 +97,16 @@ private static final String randomAlgorithm = "SHA1PRNG";
     public void initCipher(char[] password) throws InvalidPasswordException, NoSuchAlgorithmException, NoSuchPaddingException, InvalidKeyException, Exception {
         
         try{
+            //Establishing Secure Channel
             SecureChannel(password);
             
+            //Asking Card to be ready with Symm Key
             byte[] Data = new byte[password.length + salt.length];
             System.arraycopy(password.toString().getBytes(), 0, Data, 0, password.length);
-            System.arraycopy(salt, 0, Data, password.length, salt.length);
-            //Asking Card to be ready with Symm Key
-            InterFaceApplet.sendAppletInstructionSecureChannel(PCSideCardInterface.SEND_INS_GENKEY,(byte)0, (byte) 0, Data); 
+            System.arraycopy(salt, 0, Data, password.length, salt.length);            
+            InterFaceApplet.SendAppletInstructionSecureChannel(PCSideCardInterface.SEND_INS_GENKEY,(byte)0, (byte) 0, Data); 
             
-            //Generate Nounce
+            //Generate Nounce for PC
             N_1 = generateSalt();
             byte[] Temp = new byte[N_1.length + 16];   
             System.arraycopy(N_1, 0, Temp, 0, N_1.length);
@@ -113,14 +114,17 @@ private static final String randomAlgorithm = "SHA1PRNG";
             byte[] res = new byte[32];            
             cipher.doFinal(Temp, 0, 32, res, 0);
                      
-           //Send Ek(N_1 || "AAAAAAAAAAAAAAAA")
-           ResponseFromCard = InterFaceApplet.sendAppletInstructionSecureChannel(PCSideCardInterface.SEND_INS_N_1,(byte)0, (byte) 0, res);             
+           //Send Ek(Nounce_PC || ID of PC)
+           ResponseFromCard = InterFaceApplet.SendAppletInstructionSecureChannel(PCSideCardInterface.SEND_INS_N_1,(byte)0, (byte) 0, res);             
            
+           //Received response from Card Nounce_PC || Nounce_Card || ID of Card
+           
+           //Decrypting Card Nounce
            cipher.init(Cipher.DECRYPT_MODE, secretKeySpec);            
            byte[] res1 = new byte[48]; 
            cipher.doFinal(ResponseFromCard, 0, 48, res1, 0);
            
-           //System.arraycopy(res1, 16, Temp, 0, 16);
+           //Copying Nounce_Card
            System.arraycopy(res1, 16 , N_B, 0, 16);
             
            cipher.init(Cipher.ENCRYPT_MODE, secretKeySpec);           
@@ -129,65 +133,61 @@ private static final String randomAlgorithm = "SHA1PRNG";
 
            cipher.doFinal(N_B, 0, 16, res2, 0);
            
-            //Send Ek(N_B") 
-           ResponseFromCard = InterFaceApplet.sendAppletInstructionSecureChannel(PCSideCardInterface.SEND_INS_N_B,(byte)0, (byte) 0, res2);                        
+            //Send Ek(Nounce_Card) 
+           ResponseFromCard = InterFaceApplet.SendAppletInstructionSecureChannel(PCSideCardInterface.SEND_INS_N_B,(byte)0, (byte) 0, res2);                        
+           //Checking response from card for Nounce_Card
            if(ResponseFromCard == null)
            {
+               //If Nounce_Card not matching throw error
                /*throw exception*/ 
                JOptionPane.showMessageDialog(mainWindow, Translator.translate("SecureChProblem"));
                System.exit(0);
            }
-                 
+           //Nounce_Card is Verified, then Generate Session Key      
            byte[] SessionKey = new byte [16];
            System.arraycopy(N_1, 0, res, 0, 16);
            System.arraycopy(N_B, 0, res, 16, 16);
            
+           //HASH(Nounce_PC || Nounce_Card)
            MessageDigest sha = MessageDigest.getInstance("SHA-1");        
            SessionKey = Arrays.copyOf(sha.digest(res), 16);
            
+           //Initialing AES with Session Key
            sessionKeySpec = new SecretKeySpec(SessionKey,"AES");
         
-            SKcipher = Cipher.getInstance("AES/ECB/NOPADDING");//Can be seen for CBC
+           SKcipher = Cipher.getInstance("AES/ECB/NOPADDING");
         
-            SKcipher.init(Cipher.DECRYPT_MODE, sessionKeySpec);
-            
+           SKcipher.init(Cipher.DECRYPT_MODE, sessionKeySpec);
+           
+           //For New Database
            if(FileHandle == null)
            {   
-              FileHandle=InterFaceApplet.sendAppletInstruction(PCSideCardInterface.SEND_INS_SETKEY,(byte)0, (byte) 0, null , password); 
+              //Asking for Handle from Card            
+              FileHandle=InterFaceApplet.SendAppletInstruction(PCSideCardInterface.SEND_INS_SETKEY,(byte)0, (byte) 0, null , password); 
            }
-           //byte[] KeyFromCard1;
-           byte[] KeyFromCard1=InterFaceApplet.sendAppletInstruction(PCSideCardInterface.SEND_INS_GETKEY,(byte)0, (byte) 0, FileHandle, password);    
+           //Asking Key from Card
+           byte[] KeyFromCard1=InterFaceApplet.SendAppletInstruction(PCSideCardInterface.SEND_INS_GETKEY,(byte)0, (byte) 0, FileHandle, password);    
            
-           //KeyFromCard[0] = KeyFromCard1[0];
-           
+           //Extracting Key from Card           
            System.arraycopy(KeyFromCard1, (short) 0, KeyFromCard, (short)0, (short)1);
-           
+           //Decrypting the key using Session Key
            SKcipher.doFinal(KeyFromCard1, (short)1, (short)(KeyFromCard1.length-1), KeyFromCard, (short)1);
            
         }catch (InvalidPasswordException ex){
             throw ex;
         }
         
-        //PBEParametersGenerator keyGenerator = new PKCS12ParametersGenerator(new SHA256Digest());
-       // keyGenerator.init(PKCS12ParametersGenerator.PKCS12PasswordToBytes(password), FileHandle, 20);
-        //CipherParameters keyParams = keyGenerator.generateDerivedParameters(256, 128);
-        
+        //Encryption/Decryption operation
         KeyParameter aesKey=new KeyParameter(Util.cutArray(KeyFromCard,FileHandle_LENGTH,KeyLengthAES));
         ParametersWithIV keyParams = new ParametersWithIV(aesKey, Util.cutArray(KeyFromCard, FileHandle_LENGTH+KeyLengthAES, IVLengthAES));
         
+        //CipherParameters keyParams = new KeyParameter(aesKey, Util.cutArray(KeyFromCard,FileHandle_LENGTH,KeyLengthAES));
         encryptCipher = new PaddedBufferedBlockCipher(new CBCBlockCipher(new AESEngine()), new PKCS7Padding());
         encryptCipher.init(true, keyParams);
         decryptCipher = new PaddedBufferedBlockCipher(new CBCBlockCipher(new AESEngine()), new PKCS7Padding());
         decryptCipher.init(false, keyParams);
-    }
-
-    //Getting from JavaCard
-    /*private byte[] generateSalt() throws NoSuchAlgorithmException {
-        SecureRandom saltGen = SecureRandom.getInstance(randomAlgorithm);
-        byte pSalt[] = new byte[FileHandle_LENGTH];
-        saltGen.nextBytes(pSalt);
-        return pSalt;
-    }*/
+        
+    }    
 
     public byte[] encrypt(byte[] plainText) throws CryptoException {
         byte[] encryptedBytes = new byte[encryptCipher.getOutputSize(plainText.length)];
@@ -230,36 +230,41 @@ private static final String randomAlgorithm = "SHA1PRNG";
 
     private void SecureChannel(char[] password) throws NoSuchAlgorithmException, NoSuchPaddingException, InvalidKeyException, IllegalBlockSizeException, BadPaddingException, ShortBufferException {
         
+        //Generating Salt
         salt = generateSalt();
         
         byte[] Temp = new byte[password.length + salt.length];
         
-        byte[] LongKey = new byte[16];
-        
-        //for(short i=0;i<password.length;i++)
-          //  Temp[i] = (byte) password[i];
+        byte[] LongKey = new byte[16];        
+     
         System.arraycopy(password.toString().getBytes(), 0, Temp, 0, password.length);
         System.arraycopy(salt, 0, Temp, password.length, salt.length);
         
-        MessageDigest sha = MessageDigest.getInstance("SHA-1");
-        //LongKey = sha.digest(Temp);
-        LongKey = Arrays.copyOf(sha.digest(Temp), 16);
+        //Long Key using PBKDF using 100 HASH(password || salt)
+        MessageDigest sha = MessageDigest.getInstance("SHA-1");        
+        //LongKey = Arrays.copyOf(sha.digest(Temp), 16);
+        LongKey = Arrays.copyOf(sha.digest(Temp), 20);
         
+        for(short i = 0; i < 1000; i++)
+        {
+            LongKey = Arrays.copyOf(sha.digest(LongKey), 20);
+        }       
+        LongKey = Arrays.copyOf(sha.digest(LongKey), 16);
+        //Initialing AES with Long Key
         secretKeySpec = new SecretKeySpec(LongKey,"AES");
         
-        cipher = Cipher.getInstance("AES/ECB/NOPADDING");//Can be seen for CBC
+        cipher = Cipher.getInstance("AES/ECB/NOPADDING");
         
         cipher.init(Cipher.ENCRYPT_MODE, secretKeySpec);
         
-        byte[] ptdata = "123456789abcdefg".getBytes();
+        //Validating encrypted text with known plain text with Card 
+        
+        //byte[] ptdata = "123456789abcdefg".getBytes();
 
-        byte[] res = new byte[16];
-        cipher.doFinal(ptdata, 0, 16, res, 0);
+        //byte[] res = new byte[16];
+        //cipher.doFinal(ptdata, 0, 16, res, 0);
         
-        //System.out.println(res);
-        
-        
-        //throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+        //System.out.println(res);              
     }   
     
 }
