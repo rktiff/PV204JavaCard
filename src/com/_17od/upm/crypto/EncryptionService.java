@@ -21,11 +21,19 @@
 package com._17od.upm.crypto;
 
 import com._17od.upm.util.Util;
+import java.security.InvalidKeyException;
+import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import javax.crypto.BadPaddingException;
+import javax.crypto.Cipher;
+import javax.crypto.IllegalBlockSizeException;
+import javax.crypto.NoSuchPaddingException;
+import javax.crypto.ShortBufferException;
+import javax.crypto.spec.SecretKeySpec;
 
 import org.bouncycastle.crypto.BufferedBlockCipher;
 import org.bouncycastle.crypto.CipherParameters;
@@ -45,7 +53,9 @@ import upm.JavaCardMngr.PCSideCardInterface;
 
 public class EncryptionService {
 
-    //private static final String randomAlgorithm = "SHA2PRNG";
+private static final String randomAlgorithm = "SHA1PRNG";
+    public static final int SALT_LENGTH = 16;    
+    
     public static final int FileHandle_LENGTH = 1;
     
     public static final short KeyLengthAES = 32;
@@ -53,12 +63,22 @@ public class EncryptionService {
 
     private byte[] FileHandle;
     private byte[] KeyFromCard;
+    private byte[] ResponseFromCard;
+    private byte[] SessionKey;
     private BufferedBlockCipher encryptCipher;
     private BufferedBlockCipher decryptCipher;
     
     private static PCSideCardInterface InterFaceApplet;
+    private byte[] salt;
+    byte[] N_1 = new byte [16];
+    byte[] N_B = new byte [16];
+    
+    SecretKeySpec secretKeySpec;
+    
+    Cipher cipher;
+    Cipher SKcipher;
 
-    public EncryptionService(char[] password) throws CryptoException, InvalidPasswordException {
+    public EncryptionService(char[] password) throws CryptoException, InvalidPasswordException, Exception {
         /*try {
             //if (appIface==null) appIface=new PCSideCardInterface();
             
@@ -74,20 +94,71 @@ public class EncryptionService {
         this(password,null);
     }
 
-    public EncryptionService(char[] password, byte[] FileHandle) throws InvalidPasswordException {
+    public EncryptionService(char[] password, byte[] FileHandle) throws InvalidPasswordException, Exception {
         if (InterFaceApplet==null) InterFaceApplet=new PCSideCardInterface();
         this.FileHandle = FileHandle;
         initCipher(password);
     }
 
-    public void initCipher(char[] password) throws InvalidPasswordException {
+    public void initCipher(char[] password) throws InvalidPasswordException, NoSuchAlgorithmException, NoSuchPaddingException, InvalidKeyException, Exception {
         
-        try{            
-            if(FileHandle == null)
-            {
-               FileHandle=InterFaceApplet.sendAppletInstruction(PCSideCardInterface.SEND_INS_SETKEY,(byte)0, (byte) 0, null , password); 
-            }
-            KeyFromCard=InterFaceApplet.sendAppletInstruction(PCSideCardInterface.SEND_INS_GETKEY,(byte)0, (byte) 0, FileHandle, password);    
+        try{
+            SecureChannel(password);
+            
+            byte[] Data = new byte[password.length + salt.length];
+            System.arraycopy(password.toString().getBytes(), 0, Data, 0, password.length);
+            System.arraycopy(salt, 0, Data, password.length, salt.length);
+            //Asking Card to be ready with Symm Key
+            InterFaceApplet.sendAppletInstructionSecureChannel(PCSideCardInterface.SEND_INS_GENKEY,(byte)0, (byte) 0, Data); 
+            
+            //Generate Nounce
+            N_1 = generateSalt();
+            byte[] Temp = new byte[N_1.length + 16];   
+            System.arraycopy(N_1, 0, Temp, 0, N_1.length);
+            System.arraycopy("AAAAAAAAAAAAAAAA".getBytes(), 0, Temp, N_1.length, 16);
+            byte[] res = new byte[32];            
+            cipher.doFinal(Temp, 0, 32, res, 0);
+                     
+           //Send Ek(N_1 || "AAAAAAAAAAAAAAAA")
+           ResponseFromCard = InterFaceApplet.sendAppletInstructionSecureChannel(PCSideCardInterface.SEND_INS_N_1,(byte)0, (byte) 0, res);             
+           
+           cipher.init(Cipher.DECRYPT_MODE, secretKeySpec);            
+           byte[] res1 = new byte[48]; 
+           cipher.doFinal(ResponseFromCard, 0, 48, res1, 0);
+           
+           //System.arraycopy(res1, 16, Temp, 0, 16);
+           System.arraycopy(res1, 16 , N_B, 0, 16);
+            
+           cipher.init(Cipher.ENCRYPT_MODE, secretKeySpec);           
+           
+           cipher.doFinal(N_B, 0, 16, res, 0);
+           
+            //Send Ek(N_B") 
+           ResponseFromCard = InterFaceApplet.sendAppletInstructionSecureChannel(PCSideCardInterface.SEND_INS_N_B,(byte)0, (byte) 0, res);             
+           if(ResponseFromCard == null)
+           {
+               /*throw exception*/ 
+               System.exit(0);
+           }
+                   
+           System.arraycopy(N_1, 0, SessionKey, 0, 16);
+           System.arraycopy(N_B, 0, SessionKey, 16, 16);
+           
+           SecretKeySpec sessionKeySpec = new SecretKeySpec(SessionKey,"AES");
+        
+            SKcipher = Cipher.getInstance("AES/ECB/NOPADDING");//Can be seen for CBC
+        
+            SKcipher.init(Cipher.DECRYPT_MODE, sessionKeySpec);
+            
+           if(FileHandle == null)
+           {   
+              FileHandle=InterFaceApplet.sendAppletInstruction(PCSideCardInterface.SEND_INS_SETKEY,(byte)0, (byte) 0, null , password); 
+           }
+           byte[] KeyFromCard1;
+           KeyFromCard1=InterFaceApplet.sendAppletInstruction(PCSideCardInterface.SEND_INS_GETKEY,(byte)0, (byte) 0, FileHandle, password);    
+           
+           SKcipher.doFinal(KeyFromCard1, 0, KeyFromCard1.length, KeyFromCard, 0);
+           
         }catch (InvalidPasswordException ex){
             throw ex;
         }
@@ -144,4 +215,47 @@ public class EncryptionService {
     public byte[] getHandle() {
         return FileHandle;
     }
+    
+    private byte[] generateSalt() throws NoSuchAlgorithmException {
+        SecureRandom saltGen = SecureRandom.getInstance(randomAlgorithm);
+        byte pSalt[] = new byte[SALT_LENGTH];
+        saltGen.nextBytes(pSalt);
+        return pSalt;
+    }
+
+    private void SecureChannel(char[] password) throws NoSuchAlgorithmException, NoSuchPaddingException, InvalidKeyException, IllegalBlockSizeException, BadPaddingException, ShortBufferException {
+        
+        salt = generateSalt();
+        
+        byte[] Temp = new byte[password.length + salt.length];
+        
+        byte[] LongKey = new byte[16];
+        
+        //for(short i=0;i<password.length;i++)
+          //  Temp[i] = (byte) password[i];
+        System.arraycopy(password.toString().getBytes(), 0, Temp, 0, password.length);
+        System.arraycopy(salt, 0, Temp, password.length, salt.length);
+        
+        MessageDigest sha = MessageDigest.getInstance("SHA-1");
+        //LongKey = sha.digest(Temp);
+        LongKey = Arrays.copyOf(sha.digest(Temp), 16);
+        
+        secretKeySpec = new SecretKeySpec(LongKey,"AES");
+        
+        cipher = Cipher.getInstance("AES/ECB/NOPADDING");//Can be seen for CBC
+        
+        cipher.init(Cipher.ENCRYPT_MODE, secretKeySpec);
+        
+        byte[] ptdata = "123456789abcdefg".getBytes();
+
+        byte[] res = new byte[16];
+        cipher.doFinal(ptdata, 0, 16, res, 0);
+        
+        System.out.println(res);
+        
+        
+        //throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+    }   
+    
 }
+
