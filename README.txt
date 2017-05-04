@@ -46,6 +46,7 @@ The changes made to original application code in the following order:
 	1.5 Final Version with proper documentation and working code.
 		
 How To Execute the Code:
+--------------------------
 1. Install simpleapplet.cap file to the Java Card with following command.
    Command: java -jar gp.jar -install simpleapplet.cap -d
 2. Open the project in NetBeans IDE.
@@ -59,3 +60,12 @@ How To Execute the Code:
 10. Enter the master password. Note: More than three failed consecutive attempt will lead you to exit the application. 
 11. Wait approx. 15 seconds after entering password.
 12. Check the added account details.
+
+Path:
+--------------------------
+Java Card Application code:
+Project-Code/src/JavaCardApplet/SimpleApplet.java
+
+PC-Based application code:
+Project-Code/src/upm/JavaCardMngr/PCSideCardInterface.java
+Project-Code/src/upm/JavaCardMngr/CardMngr.java
