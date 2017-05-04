@@ -84,6 +84,8 @@ import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * This is the main application entry class
@@ -419,7 +421,9 @@ public class MainWindow extends JFrame implements ActionListener {
 					} catch (IOException e1) {
 						// TODO Auto-generated catch block
 						e1.printStackTrace();
-					}
+					} catch (Exception ex) {
+                                        Logger.getLogger(MainWindow.class.getName()).log(Level.SEVERE, null, ex);
+                                    }
 
 				}
 			}

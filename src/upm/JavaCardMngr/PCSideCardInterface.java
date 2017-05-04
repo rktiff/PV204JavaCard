@@ -44,7 +44,7 @@ public class PCSideCardInterface {
     public PCSideCardInterface() throws Exception {
         
         // Init real card 
-        /*try{                
+        try{                
             if (cardMngr.ConnectToCard())//Real Card
             {
                         // Select our application on card
@@ -54,10 +54,10 @@ public class PCSideCardInterface {
         catch (Exception ex)
         {
             System.out.println("Exception : " + ex);
-        }*/
+        }
         
         // Init card simulator
-        cardMngr.prepareLocalSimulatorApplet(APPLET_AID, EMPTY, SimpleApplet.class);
+        //cardMngr.prepareLocalSimulatorApplet(APPLET_AID, EMPTY, SimpleApplet.class);
     }
     
     //Method used to construct APDU with instruction and optional additional data, send it and receive response
@@ -78,13 +78,13 @@ public class PCSideCardInterface {
             // TODO parse correct answers and error
             
             // Init card simulator
-            byte[] response = cardMngr.sendAPDUSimulator(apdu);          
-            return response;
+            /*byte[] response = cardMngr.sendAPDUSimulator(apdu);          
+            return response;*/
             
             //For Real Card
-            /*ResponseAPDU output = cardMngr.sendAPDU(apdu);//Real Card
+            ResponseAPDU output = cardMngr.sendAPDU(apdu);//Real Card
             byte[] ResponseText = output.getBytes();
-            return ResponseText;*/
+            return ResponseText;
 
         } catch (Exception ex) {
             System.out.println("Exception : " + ex);

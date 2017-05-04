@@ -20,6 +20,8 @@
  */
 package com._17od.upm.crypto;
 
+import com._17od.upm.gui.MainWindow;
+import com._17od.upm.util.Translator;
 import com._17od.upm.util.Util;
 import java.security.InvalidKeyException;
 import java.security.MessageDigest;
@@ -34,6 +36,7 @@ import javax.crypto.IllegalBlockSizeException;
 import javax.crypto.NoSuchPaddingException;
 import javax.crypto.ShortBufferException;
 import javax.crypto.spec.SecretKeySpec;
+import javax.swing.JOptionPane;
 
 import org.bouncycastle.crypto.BufferedBlockCipher;
 import org.bouncycastle.crypto.CipherParameters;
@@ -78,20 +81,10 @@ private static final String randomAlgorithm = "SHA1PRNG";
     
     Cipher cipher;
     Cipher SKcipher;
+    
+    private MainWindow mainWindow;
 
     public EncryptionService(char[] password) throws CryptoException, InvalidPasswordException, Exception {
-        /*try {
-            //if (appIface==null) appIface=new PCSideCardInterface();
-            
-            //salt=appIface.sendAppletInstruction(PCSideCardInterface.SEND_INS_SETKEY,(byte)0, (byte) 0, databasePinBytes);
-            //salt=appIface.sendAppletInstruction("0xb0,0x53",(byte)0, (byte) 0, password);
-            //salt = appIface.sendAppletInstruction();
-            //this.salt = generateSalt();//Getting from JavaCard
-        } catch (NoSuchAlgorithmException e) {
-            throw new CryptoException(e);
-        }*/
-        //this.FileHandle = null;
-        //initCipher(password);        
         this(password,null);
     }
 
@@ -137,10 +130,11 @@ private static final String randomAlgorithm = "SHA1PRNG";
            cipher.doFinal(N_B, 0, 16, res2, 0);
            
             //Send Ek(N_B") 
-           ResponseFromCard = InterFaceApplet.sendAppletInstructionSecureChannel(PCSideCardInterface.SEND_INS_N_B,(byte)0, (byte) 0, res2);             
+           ResponseFromCard = InterFaceApplet.sendAppletInstructionSecureChannel(PCSideCardInterface.SEND_INS_N_B,(byte)0, (byte) 0, res2);                        
            if(ResponseFromCard == null)
            {
                /*throw exception*/ 
+               JOptionPane.showMessageDialog(mainWindow, Translator.translate("SecureChProblem"));
                System.exit(0);
            }
                  
@@ -262,7 +256,7 @@ private static final String randomAlgorithm = "SHA1PRNG";
         byte[] res = new byte[16];
         cipher.doFinal(ptdata, 0, 16, res, 0);
         
-        System.out.println(res);
+        //System.out.println(res);
         
         
         //throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.

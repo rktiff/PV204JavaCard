@@ -77,6 +77,8 @@ public class DatabaseActions {
     private int msToWaitBeforeClosingDB;
 
     private boolean runSetDBDirtyThread = true;
+    
+    private static int NumAttempts=0;
 
 
     public DatabaseActions(MainWindow mainWindow) {
@@ -91,7 +93,7 @@ public class DatabaseActions {
      * @throws CryptoException
      * @throws IOException
      */
-    public void newDatabase() throws IOException, CryptoException {
+    public void newDatabase() throws IOException, CryptoException, InvalidPasswordException, Exception {
 
         File newDatabaseFile = getSaveAsFile(Translator.translate("newPasswordDatabase"));
         if (newDatabaseFile == null) {
@@ -153,7 +155,7 @@ public class DatabaseActions {
     }
 
 
-    public void changeMasterPassword() throws IOException, ProblemReadingDatabaseFile, CryptoException, PasswordDatabaseException, TransportException {
+    public void changeMasterPassword() throws IOException, ProblemReadingDatabaseFile, CryptoException, PasswordDatabaseException, TransportException, InvalidPasswordException, Exception {
 
         if (getLatestVersionOfDatabase()) {
             //The first task is to get the current master password
@@ -168,6 +170,15 @@ public class DatabaseActions {
                         dbPers.load(database.getDatabaseFile(), password);
                         passwordCorrect = true;
                     } catch (InvalidPasswordException e) {
+                        
+                        /*NumAttempts++;
+                        
+                        if(NumAttempts > 3) 
+                        {
+                            JOptionPane.showMessageDialog(mainWindow, Translator.translate("Number of Attempts Exceeded"));
+                            System.exit(0);
+                        }*/
+                        
                         JOptionPane.showMessageDialog(mainWindow, Translator.translate("incorrectPassword"));
                     }
                 }
@@ -365,12 +376,12 @@ public class DatabaseActions {
     }
 
 
-    public void openDatabase(String databaseFilename) throws IOException, ProblemReadingDatabaseFile, CryptoException {
+    public void openDatabase(String databaseFilename) throws IOException, ProblemReadingDatabaseFile, CryptoException, Exception {
         openDatabase(databaseFilename, null);
     }
 
 
-    public void openDatabase(String databaseFilename, char[] password) throws IOException, ProblemReadingDatabaseFile, CryptoException {
+    public void openDatabase(String databaseFilename, char[] password) throws IOException, ProblemReadingDatabaseFile, CryptoException, Exception {
 
         boolean passwordCorrect = false;
         boolean okClicked = true;
@@ -391,6 +402,14 @@ public class DatabaseActions {
                     database = dbPers.load(new File(databaseFilename), password);
                     passwordCorrect = true;
                 } catch (InvalidPasswordException e) {
+                    NumAttempts++;
+                        
+                        if(NumAttempts > 3) 
+                        {
+                            JOptionPane.showMessageDialog(mainWindow, Translator.translate("NumberofAttemptsExceeded"));
+                            System.exit(0);
+                        }
+                    
                     JOptionPane.showMessageDialog(mainWindow, Translator.translate("incorrectPassword"));
                     password = null;
                 }
@@ -404,7 +423,7 @@ public class DatabaseActions {
     }
 
 
-    public void openDatabase() throws IOException, ProblemReadingDatabaseFile, CryptoException {
+    public void openDatabase() throws IOException, ProblemReadingDatabaseFile, CryptoException, Exception {
         JFileChooser fc = new JFileChooser();
         fc.setDialogTitle(Translator.translate("openDatabase"));
         int returnVal = fc.showOpenDialog(mainWindow);
@@ -423,7 +442,7 @@ public class DatabaseActions {
     }
 
 
-    public void deleteAccount() throws IOException, CryptoException, TransportException, ProblemReadingDatabaseFile, PasswordDatabaseException {
+    public void deleteAccount() throws IOException, CryptoException, TransportException, ProblemReadingDatabaseFile, PasswordDatabaseException, Exception {
 
         if (getLatestVersionOfDatabase()) {
             SortedListModel listview = (SortedListModel) mainWindow.getAccountsListview().getModel();
@@ -446,7 +465,7 @@ public class DatabaseActions {
     }
 
 
-    public void addAccount() throws IOException, CryptoException, TransportException, ProblemReadingDatabaseFile, PasswordDatabaseException {
+    public void addAccount() throws IOException, CryptoException, TransportException, ProblemReadingDatabaseFile, PasswordDatabaseException, Exception {
 
         if (getLatestVersionOfDatabase()) {
 
@@ -478,7 +497,7 @@ public class DatabaseActions {
     }
 
 
-    private boolean getLatestVersionOfDatabase() throws TransportException, ProblemReadingDatabaseFile, IOException, CryptoException, PasswordDatabaseException {
+    private boolean getLatestVersionOfDatabase() throws TransportException, ProblemReadingDatabaseFile, IOException, CryptoException, PasswordDatabaseException, Exception {
         boolean latestVersionDownloaded = false;
 
         // Ensure we're working with the latest version of the database
@@ -515,7 +534,7 @@ public class DatabaseActions {
 
     public void editAccount(String accountName) throws TransportException,
             ProblemReadingDatabaseFile, IOException, CryptoException,
-            PasswordDatabaseException, InvalidPasswordException, UPMException {
+            PasswordDatabaseException, InvalidPasswordException, UPMException, Exception {
 
         if (getLatestVersionOfDatabase()) {
             AccountInformation accInfo = database.getAccount(accountName);
@@ -650,7 +669,7 @@ public class DatabaseActions {
     }
 
 
-    public void showDatabaseProperties() throws ProblemReadingDatabaseFile, IOException, CryptoException, PasswordDatabaseException {
+    public void showDatabaseProperties() throws ProblemReadingDatabaseFile, IOException, CryptoException, PasswordDatabaseException, Exception {
         try {
             if (getLatestVersionOfDatabase()) {
                 DatabasePropertiesDialog dbPropsDialog = new DatabasePropertiesDialog(mainWindow, getAccountNames(), database);
@@ -672,7 +691,7 @@ public class DatabaseActions {
     }
 
 
-    public void openDatabaseFromURL() throws TransportException, IOException, ProblemReadingDatabaseFile, CryptoException {
+    public void openDatabaseFromURL() throws TransportException, IOException, ProblemReadingDatabaseFile, CryptoException, Exception {
 
         // Ask the user for the remote database location
         OpenDatabaseFromURLDialog openDBDialog = new OpenDatabaseFromURLDialog(mainWindow);
@@ -712,7 +731,7 @@ public class DatabaseActions {
     }
 
     public void reloadDatabase()
-            throws InvalidPasswordException, ProblemReadingDatabaseFile, IOException {
+            throws InvalidPasswordException, ProblemReadingDatabaseFile, IOException, Exception {
         PasswordDatabase reloadedDb = null;
         try {
             reloadedDb = dbPers.load(database.getDatabaseFile());
@@ -745,7 +764,7 @@ public class DatabaseActions {
 
     public void reloadDatabaseBefore(ChangeDatabaseAction editAction)
             throws InvalidPasswordException, ProblemReadingDatabaseFile,
-            IOException {
+            IOException, Exception {
         boolean proceedWithAction = false;
         if (this.databaseNeedsReload) {
             int answer = JOptionPane.showConfirmDialog(mainWindow,
@@ -765,7 +784,7 @@ public class DatabaseActions {
     }
 
     public boolean reloadDatabaseFromDisk() throws InvalidPasswordException,
-            ProblemReadingDatabaseFile, IOException {
+            ProblemReadingDatabaseFile, IOException, Exception {
         boolean reloadSuccessful = false;
 
         PasswordDatabase reloadedDb = null;
@@ -804,7 +823,7 @@ public class DatabaseActions {
         return reloadSuccessful;
     }
 
-    public boolean syncWithRemoteDatabase() throws TransportException, ProblemReadingDatabaseFile, IOException, CryptoException, PasswordDatabaseException {
+    public boolean syncWithRemoteDatabase() throws TransportException, ProblemReadingDatabaseFile, IOException, CryptoException, PasswordDatabaseException, Exception {
 
         boolean syncSuccessful = false;
 
@@ -942,7 +961,7 @@ public class DatabaseActions {
     }
 
 
-    public void importAccounts() throws TransportException, ProblemReadingDatabaseFile, IOException, CryptoException, PasswordDatabaseException {
+    public void importAccounts() throws TransportException, ProblemReadingDatabaseFile, IOException, CryptoException, PasswordDatabaseException, Exception {
         if (getLatestVersionOfDatabase()) {
             // Prompt for the file to import
             JFileChooser fc = new JFileChooser();

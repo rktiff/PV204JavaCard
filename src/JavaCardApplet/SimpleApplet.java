@@ -1,5 +1,7 @@
 package JavaCardApplet;
 
+//package applets;
+
 import javacard.framework.*;
 import javacard.security.*;
 import javacardx.crypto.*;
@@ -265,9 +267,9 @@ public class SimpleApplet extends javacard.framework.Applet
             // INIT CIPHERS WITH NEW KEY
             m_encryptCipher.init(m_aesLongKey, Cipher.MODE_ENCRYPT);
             
-            byte[] ptdata = "123456789abcdefg".getBytes();
+            //byte[] ptdata = "123456789abcdefg".getBytes();
 
-            m_encryptCipher.doFinal(ptdata, (short) 0, (short) 16, res, (short) 0);
+            //m_encryptCipher.doFinal(ptdata, (short) 0, (short) 16, res, (short) 0);
             
         
             //System.out.println(res);
@@ -291,7 +293,8 @@ public class SimpleApplet extends javacard.framework.Applet
 
         Util.arrayCopyNonAtomic(resN_1, (short) 0, Temp, (short) (0), (short) 16);
         Util.arrayCopyNonAtomic(N_B, (short) 0, Temp, (short) (16), (short)N_B.length);
-        Util.arrayCopyNonAtomic("BBBBBBBBBBBBBBBB".getBytes(), (short) 0, Temp, (short) (16+16), (short)16);
+        for(short i=(short)(2*16);i<(short)(3*16);i++) Temp[i] = (byte) 0x42;
+        //Util.arrayCopyNonAtomic("BBBBBBBBBBBBBBBB".getBytes(), (short) 0, Temp, (short) (16+16), (short)16);
         
         m_encryptCipher.init(m_aesLongKey, Cipher.MODE_ENCRYPT);
 
@@ -312,7 +315,7 @@ public class SimpleApplet extends javacard.framework.Applet
         
         m_decryptCipher.doFinal(apdubuf, ISO7816.OFFSET_CDATA, dataLen, resN_B, (short) 0);
         
-        short i = Util.arrayCompare(N_B, (short)0, resN_B, (short)0, (short)dataLen);
+        short i = Util.arrayCompare(N_B, (short)0, resN_B, (short)0, dataLen);
         
         if(i == 0)
         {
