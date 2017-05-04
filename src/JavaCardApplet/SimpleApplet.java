@@ -1,87 +1,123 @@
 package JavaCardApplet;
 
-// specific import for Javacard API access
 import javacard.framework.*;
 import javacard.security.*;
 import javacardx.crypto.*;
 
 public class SimpleApplet extends javacard.framework.Applet
 {
-   // MAIN INSTRUCTION CLASS
+    // MAIN INSTRUCTION CLASS
     final static byte CLA_SIMPLEAPPLET                = (byte) 0xB0;
 
     // INSTRUCTIONS
-   
-    final static byte INS_SETKEY                     = (byte) 0x52;   
+    
+    final static byte INS_SETKEY                     = (byte) 0x52;
     final static byte INS_GETKEY                     = (byte) 0x53;
-   
-
-    final static byte PIN_LEN                       = (byte) 16;
-    final static byte DB_CNT                        =  (byte) 4;
-    final static byte IV_SIZE                       = (byte) 16;
-    final static byte KEY_SIZE                      = (byte) 32;
     
-    //final static short ARRAY_LENGTH                   = (short) 0xff;
-    //final static byte  AES_BLOCK_LENGTH               = (short) 0x16;
-
-    
+    final static short SW_BAD_TEST_DATA_LEN          = (short) 0x6680;
     final static short SW_BAD_Handle             = (short) 0x6715;
-   
+    final static short SW_CIPHER_DATA_LENGTH_BAD     = (short) 0x6710;
+    final static short SW_OBJECT_NOT_AVAILABLE       = (short) 0x6711;
     final static short SW_BAD_PIN                    = (short) 0x6900;
     
+    final static short SW_Exception                     = (short) 0xff01;
+    final static short SW_ArrayIndexOutOfBoundsException = (short) 0xff02;
+    final static short SW_ArithmeticException           = (short) 0xff03;
+    final static short SW_ArrayStoreException           = (short) 0xff04;
+    final static short SW_NullPointerException          = (short) 0xff05;
+    final static short SW_NegativeArraySizeException    = (short) 0xff06;
+    final static short SW_CryptoException_prefix        = (short) 0xf100;
+    final static short SW_SystemException_prefix        = (short) 0xf200;
+    final static short SW_PINException_prefix           = (short) 0xf300;
+    final static short SW_TransactionException_prefix   = (short) 0xf400;
+    final static short SW_CardRuntimeException_prefix   = (short) 0xf500;
+
+    final static byte DB_CNT                        =  (byte) 4;
+    final static byte PIN_LEN                       = (byte) 16;
+    final static byte IV_SIZE                       = (byte) 16;
+    final static byte KEY_SIZE                      = (byte) 32;
+
+   private   byte           NumKey = 0;
+    private   byte           DBID = 0; 
+   private   RandomData     m_secureRandom = null;
+      
+
+
     private   AESKey[]         KeyArray = new AESKey[DB_CNT];
     private   AESKey[]         IVArray = new AESKey[DB_CNT];
     private   OwnerPIN[]       PINArray = new OwnerPIN[DB_CNT];
-    
-    private   byte           NumKey = 0;
-    private   byte           DBID = 0;
-    private   RandomData     m_secureRandom = null;
-        
+
+    /**
+     * SimpleApplet default constructor
+     * Only this class's install method should create the applet object.
+     */
     protected SimpleApplet(byte[] buffer, short offset, byte length)
     {
-        m_secureRandom = RandomData.getInstance(RandomData.ALG_SECURE_RANDOM);
         
-        for(short i=0; i<DB_CNT; i++) PINArray[i] = new OwnerPIN((byte) 3, (byte) PIN_LEN);
-        for(short i=0; i<DB_CNT; i++) KeyArray[i] = (AESKey) KeyBuilder.buildKey(KeyBuilder.TYPE_AES, KeyBuilder.LENGTH_AES_256, false);
-        for(short i=0; i<DB_CNT; i++) IVArray[i] = (AESKey) KeyBuilder.buildKey(KeyBuilder.TYPE_AES, KeyBuilder.LENGTH_AES_256, false);
-        register();
-        /*// data offset is used for application specific parameter.
+        // CREATE RANDOM DATA GENERATORS
+            m_secureRandom = RandomData.getInstance(RandomData.ALG_SECURE_RANDOM);             
+	   
+            for(short i=0; i<DB_CNT; i++) 
+ 	    {
+		PINArray[i] = new OwnerPIN((byte) 3, PIN_LEN);
+	    }
+
+            for(short i=0; i<DB_CNT; i++) KeyArray[i] = (AESKey) KeyBuilder.buildKey(KeyBuilder.TYPE_AES, KeyBuilder.LENGTH_AES_256, false);
+	    for(short i=0; i<DB_CNT; i++) IVArray[i] = (AESKey) KeyBuilder.buildKey(KeyBuilder.TYPE_AES, KeyBuilder.LENGTH_AES_256, false);
+            
+            register();
+        
+        // data offset is used for application specific parameter.
         // initialization with default offset (AID offset).
-        short dataOffset = offset;
+        /*short dataOffset = offset;
         boolean isOP2 = false;
 
         if(length > 9) {
-           
+            // Install parameter detail. Compliant with OP 2.0.1.
+
+            // | size | content
+            // |------|---------------------------
+            // |  1   | [AID_Length]
+            // | 5-16 | [AID_Bytes]
+            // |  1   | [Privilege_Length]
+            // | 1-n  | [Privilege_Bytes] (normally 1Byte)
+            // |  1   | [Application_Proprietary_Length]
+            // | 0-m  | [Application_Proprietary_Bytes]
+
             // shift to privilege offset
             dataOffset += (short)( 1 + buffer[offset]);
             // finally shift to Application specific offset
             dataOffset += (short)( 1 + buffer[dataOffset]);
 
             // go to proprietary data
-            dataOffset++;
+            dataOffset++;          
 
-            m_dataArray = new byte[ARRAY_LENGTH];
-            Util.arrayFillNonAtomic(m_dataArray, (short) 0, ARRAY_LENGTH, (byte) 0);
 
-            // CREATE AES KEY OBJECT
-            m_aesKey = (AESKey) KeyBuilder.buildKey(KeyBuilder.TYPE_AES, KeyBuilder.LENGTH_AES_256, false);
-            
-            // CREATE RANDOM DATA GENERATORS
-             m_secureRandom = RandomData.getInstance(RandomData.ALG_SECURE_RANDOM);
+	    // CREATE RANDOM DATA GENERATORS
+            m_secureRandom = RandomData.getInstance(RandomData.ALG_SECURE_RANDOM);             
+	   
+            for(short i=0; i<DB_CNT; i++) 
+ 	    {
+		PINArray[i] = new OwnerPIN((byte) 3, PIN_LEN);
+	    }
 
-            // TEMPORARY BUFFER USED FOR FAST OPERATION WITH MEMORY LOCATED IN RAM
-            m_ramArray = JCSystem.makeTransientByteArray((short) 260, JCSystem.CLEAR_ON_DESELECT);
+            for(short i=0; i<DB_CNT; i++) KeyArray[i] = (AESKey) KeyBuilder.buildKey(KeyBuilder.TYPE_AES, KeyBuilder.LENGTH_AES_256, false);
+	    for(short i=0; i<DB_CNT; i++) IVArray[i] = (AESKey) KeyBuilder.buildKey(KeyBuilder.TYPE_AES, KeyBuilder.LENGTH_AES_256, false);
 
-            // SET KEY VALUE
-            m_aesKey.setKey(m_dataArray, (short) 0);      
-            
-            // update flag
             isOP2 = true;
 
-        } 
-        register();*/
+        } else {
+           // <IF NECESSARY, USE COMMENTS TO CHECK LENGTH >
+           // if(length != <PUT YOUR PARAMETERS LENGTH> )
+           //     ISOException.throwIt((short)(ISO7816.SW_WRONG_LENGTH + length));
+       }
+
+        // <PUT YOUR CREATION ACTION HERE>
+
+        // register this instance
+          register();*/
     }
-    
+
     /**
      * Method installing the applet.
      * @param bArray the array constaining installation parameters
@@ -115,8 +151,8 @@ public class SimpleApplet extends javacard.framework.Applet
 
         return;
     }
-    
-     /**
+
+    /**
      * Method processing an incoming APDU.
      * @see APDU
      * @param apdu the incoming APDU
@@ -126,22 +162,22 @@ public class SimpleApplet extends javacard.framework.Applet
     {
         // get the APDU buffer
         byte[] apduBuffer = apdu.getBuffer();        
+
+        // ignore the applet select command dispached to the process
         if (selectingApplet())
             return;
 
-        try {
-            
+        try {            
             // APDU instruction parser
             if (apduBuffer[ISO7816.OFFSET_CLA] == CLA_SIMPLEAPPLET) {
                 switch ( apduBuffer[ISO7816.OFFSET_INS] )
                 {
-                    case INS_SETKEY: SetKey(apdu); break;                  
-                    case INS_GETKEY: GetKey(apdu); break;                    
+                    case INS_SETKEY: SetKey(apdu); break;                    
+		    case INS_GETKEY: GetKey(apdu); break;                
                     default :
                         // The INS code is not supported by the dispatcher
                         ISOException.throwIt( ISO7816.SW_INS_NOT_SUPPORTED ) ;
                     break ;
-
                 }
             }
             else ISOException.throwIt( ISO7816.SW_CLA_NOT_SUPPORTED);
@@ -149,11 +185,35 @@ public class SimpleApplet extends javacard.framework.Applet
             // Capture all reasonable exceptions and change into readable ones (instead of 0x6f00) 
         } catch (ISOException e) {
             throw e; // Our exception from code, just re-emit
-        }    
+        } catch (ArrayIndexOutOfBoundsException e) {
+            ISOException.throwIt(SW_ArrayIndexOutOfBoundsException);
+        } catch (ArithmeticException e) {
+            ISOException.throwIt(SW_ArithmeticException);
+        } catch (ArrayStoreException e) {
+            ISOException.throwIt(SW_ArrayStoreException);
+        } catch (NullPointerException e) {
+            ISOException.throwIt(SW_NullPointerException);
+        } catch (NegativeArraySizeException e) {
+            ISOException.throwIt(SW_NegativeArraySizeException);
+        } catch (CryptoException e) {
+            ISOException.throwIt((short) (SW_CryptoException_prefix | e.getReason()));
+        } catch (SystemException e) {
+            ISOException.throwIt((short) (SW_SystemException_prefix | e.getReason()));
+        } catch (PINException e) {
+            ISOException.throwIt((short) (SW_PINException_prefix | e.getReason()));
+        } catch (TransactionException e) {
+            ISOException.throwIt((short) (SW_TransactionException_prefix | e.getReason()));
+        } catch (CardRuntimeException e) {
+            ISOException.throwIt((short) (SW_CardRuntimeException_prefix | e.getReason()));
+        } catch (Exception e) {
+            ISOException.throwIt(SW_Exception);
+        }
+        
     }
-    
-    // SET ENCRYPTION & DECRYPTION KEY
-    void SetKey(APDU apdu) {
+
+    // SET the KEY
+    void SetKey(APDU apdu) 
+    {
       byte[]    apdubuf = apdu.getBuffer();
       short     dataLen = apdu.setIncomingAndReceive();
       
@@ -162,21 +222,22 @@ public class SimpleApplet extends javacard.framework.Applet
       
 
       KeyArray[NumKey].setKey(RandomNumber, (byte)0);  
-      IVArray[NumKey].setKey(RandomNumber, (byte)KEY_SIZE);   
+      IVArray[NumKey].setKey(RandomNumber, KEY_SIZE);   
       PINArray[NumKey].update(apdubuf,ISO7816.OFFSET_CDATA, (byte)dataLen);
       NumKey++;
       //Handle
       apdubuf[ISO7816.OFFSET_CDATA] = (byte)(NumKey-1);
       apdu.setOutgoingAndSend(ISO7816.OFFSET_CDATA, (byte)1);
-    }   
+    }
 
-    void GetKey(APDU apdu) {
+    void GetKey(APDU apdu) 
+    {
       byte[]    apdubuf = apdu.getBuffer();
       short     dataLen = apdu.setIncomingAndReceive();
       byte[]    Temp = new byte[32];
       short FlagMatch = 1;
       
-      byte Handle = (byte) apdubuf[ISO7816.OFFSET_CDATA];
+      byte Handle = apdubuf[ISO7816.OFFSET_CDATA];
       
       if(Handle < NumKey)
       {
@@ -195,15 +256,21 @@ public class SimpleApplet extends javacard.framework.Applet
       if(FlagMatch==1) 
       {
               //DBID = (byte)j;
-              apdubuf[ISO7816.OFFSET_CDATA] = (byte)Handle;
+              apdubuf[ISO7816.OFFSET_CDATA] = Handle;
               KeyArray[Handle].getKey(Temp, (byte)0);
-              for(short i=0; i<KEY_SIZE; i++)
-                apdubuf[i+ISO7816.OFFSET_CDATA+1] = Temp[i];
+              //for(short i=0; i<KEY_SIZE; i++)
+              //  apdubuf[i+ISO7816.OFFSET_CDATA+1] = Temp[i];
+
+	      Util.arrayCopyNonAtomic(Temp, (short) 0, apdubuf, (short) (ISO7816.OFFSET_CDATA + 1), KEY_SIZE);
+
               IVArray[Handle].getKey(Temp, (byte)0);
-              for(short i=0; i<IV_SIZE; i++)
-                apdubuf[i+ISO7816.OFFSET_CDATA+33] = Temp[i];              
+              //for(short i=0; i<IV_SIZE; i++)
+                //apdubuf[i+ISO7816.OFFSET_CDATA+33] = Temp[i];              
+
+	      Util.arrayCopyNonAtomic(Temp, (short) 0, apdubuf, (short) (ISO7816.OFFSET_CDATA + 33), IV_SIZE);
+
               apdu.setOutgoingAndSend(ISO7816.OFFSET_CDATA, (byte)(1+KEY_SIZE+IV_SIZE));
               return;
       }
-    }    
+    } 
 }
