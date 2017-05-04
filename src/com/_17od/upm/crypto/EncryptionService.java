@@ -181,8 +181,6 @@ private static final String randomAlgorithm = "SHA1PRNG";
         }
         
         //Encryption/Decryption operation
-        //KeyParameter aesKey=new KeyParameter(Util.cutArray(KeyFromCard,FileHandle_LENGTH,KeyLengthAES));
-        //ParametersWithIV keyParams = new ParametersWithIV(aesKey, Util.cutArray(KeyFromCard, FileHandle_LENGTH+KeyLengthAES, IVLengthAES));
         
         KeyParameter keyParams = new KeyParameter(Util.cutArray(KeyFromCard,FileHandle_LENGTH,KeyLengthAES));
         
