@@ -32,6 +32,9 @@ public class PCSideCardInterface {
     
     public final static byte SEND_INS_GETKEY[]                = {(byte) 0xB0, (byte) 0x53};
     public final static byte SEND_INS_SETKEY[]                = {(byte) 0xB0, (byte) 0x52};
+    public final static byte SEND_INS_GENKEY[]                = {(byte) 0xB0, (byte) 0x50};
+    public final static byte SEND_INS_N_1[]                = {(byte) 0xB0, (byte) 0x51};
+    public final static byte SEND_INS_N_B[]                = {(byte) 0xB0, (byte) 0x54};
     
     final static short OK                               = (short) 0x9000;
     final static short SW_BAD_PIN                       = (short) 0x6900;
@@ -41,7 +44,7 @@ public class PCSideCardInterface {
     public PCSideCardInterface() throws Exception {
         
         // Init real card 
-        try{                
+        /*try{                
             if (cardMngr.ConnectToCard())//Real Card
             {
                         // Select our application on card
@@ -51,10 +54,10 @@ public class PCSideCardInterface {
         catch (Exception ex)
         {
             System.out.println("Exception : " + ex);
-        }
+        }*/
         
         // Init card simulator
-        //cardMngr.prepareLocalSimulatorApplet(APPLET_AID, EMPTY, SimpleApplet.class);
+        cardMngr.prepareLocalSimulatorApplet(APPLET_AID, EMPTY, SimpleApplet.class);
     }
     
     //Method used to construct APDU with instruction and optional additional data, send it and receive response
@@ -75,13 +78,13 @@ public class PCSideCardInterface {
             // TODO parse correct answers and error
             
             // Init card simulator
-            //byte[] response = cardMngr.sendAPDUSimulator(apdu);          
-            //return response;
+            byte[] response = cardMngr.sendAPDUSimulator(apdu);          
+            return response;
             
             //For Real Card
-            ResponseAPDU output = cardMngr.sendAPDU(apdu);//Real Card
+            /*ResponseAPDU output = cardMngr.sendAPDU(apdu);//Real Card
             byte[] ResponseText = output.getBytes();
-            return ResponseText;
+            return ResponseText;*/
 
         } catch (Exception ex) {
             System.out.println("Exception : " + ex);
@@ -106,11 +109,47 @@ public class PCSideCardInterface {
         if(shortstatus==OK){
             return true;
         }
-        else if (shortstatus==SW_BAD_PIN){
+        /*/else if (shortstatus==SW_BAD_PIN){
             throw new InvalidPasswordException();
-        }
+        }*/
         else throw new InvalidPasswordException();
     }
+    
+    public byte[] sendAppletInstructionSecureChannel (byte[] instruction, byte P1, byte P2, byte[] data) throws Exception
+    {
+        //byte[] databasePinBytes = new String(password).getBytes(Charset.forName("UTF-8"));
+        byte[] additionalData = new byte[data.length];
+    
+    
+        //System.arraycopy(password.toString().getBytes(), 0, additionalData, 0, password.length);
+        //System.arraycopy(salt, 0, additionalData, password.length, salt.length);
+        
+        try{
+            byte[] result=null;
+            byte[] response=sendApduAndReceive(instruction, P1, P2, additionalData);
+
+            //if(response.length<2) throw new SmartUPMAppletException("Unexpected Applet Response.");
+
+            //Applet response is at least 2 bytes, last 2 bytes are status word.
+
+            if(response.length>2){
+                result=new byte[response.length-2];
+                System.arraycopy(response,0,result,0,result.length);
+            }
+            byte status[]=new byte[2];
+            System.arraycopy(response,response.length-2,status,0,2);
+            
+            if (parseStatusWord(status, status.length)) return result;
+            else return null;
+            
+            /*if( (status[0] == 0x90) && (status[1] == 0x0) )
+                return result;
+            else return null; */           
+        }
+        catch(Exception ex){
+            throw ex;
+        }
+    }    
     
     public byte[] sendAppletInstruction(byte[] instruction, byte P1, byte P2, byte[] Handle, char[] password) throws InvalidPasswordException{
     

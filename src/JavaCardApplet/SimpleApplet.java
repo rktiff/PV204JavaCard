@@ -10,13 +10,15 @@ public class SimpleApplet extends javacard.framework.Applet
     final static byte CLA_SIMPLEAPPLET                = (byte) 0xB0;
 
     // INSTRUCTIONS
-    
+    final static byte INS_GENKEY                     = (byte) 0x50;
+    final static byte INS_N_1                        = (byte) 0x51;
+    final static byte INS_N_B                        = (byte) 0x54;
     final static byte INS_SETKEY                     = (byte) 0x52;
     final static byte INS_GETKEY                     = (byte) 0x53;
     
     final static short SW_BAD_TEST_DATA_LEN          = (short) 0x6680;
-    final static short SW_BAD_Handle             = (short) 0x6715;
-    final static short SW_CIPHER_DATA_LENGTH_BAD     = (short) 0x6710;
+    final static short SW_BAD_Handle                 = (short) 0x6715;
+    final static short SW_WRONG_N_B                  = (short) 0x6710;
     final static short SW_OBJECT_NOT_AVAILABLE       = (short) 0x6711;
     final static short SW_BAD_PIN                    = (short) 0x6900;
     
@@ -40,7 +42,19 @@ public class SimpleApplet extends javacard.framework.Applet
    private   byte           NumKey = 0;
     private   byte           DBID = 0; 
    private   RandomData     m_secureRandom = null;
-      
+   private   MessageDigest  m_hash = null;
+   private   AESKey         m_aesLongKey = null;
+   private   Cipher         m_encryptCipher = null;
+   private   Cipher         m_decryptCipher = null;
+   
+   private   AESKey         m_aesSessionKey = null;
+   private   Cipher         m_encryptSKCipher = null;
+   private   Cipher         m_decryptSKCipher = null;
+   
+   private byte[] LongKey = new byte[16];
+   private byte[] SessionKey = new byte[16];
+   byte[]    N_B = new byte[16];
+   byte[]    resN_1 = new byte[16];
 
 
     private   AESKey[]         KeyArray = new AESKey[DB_CNT];
@@ -55,8 +69,23 @@ public class SimpleApplet extends javacard.framework.Applet
     {
         
         // CREATE RANDOM DATA GENERATORS
-            m_secureRandom = RandomData.getInstance(RandomData.ALG_SECURE_RANDOM);             
-	   
+            m_secureRandom = RandomData.getInstance(RandomData.ALG_SECURE_RANDOM); 
+
+            // INIT HASH ENGINE
+            m_hash = MessageDigest.getInstance(MessageDigest.ALG_SHA, false);
+            
+            // CREATE AES KEY OBJECT
+            m_aesLongKey = (AESKey) KeyBuilder.buildKey(KeyBuilder.TYPE_AES, KeyBuilder.LENGTH_AES_128, false);
+            // CREATE OBJECTS FOR CBC CIPHERING
+            m_encryptCipher = Cipher.getInstance(Cipher.ALG_AES_BLOCK_128_ECB_NOPAD, false);
+            m_decryptCipher = Cipher.getInstance(Cipher.ALG_AES_BLOCK_128_ECB_NOPAD, false);
+            
+            // CREATE AES KEY OBJECT
+            m_aesSessionKey = (AESKey) KeyBuilder.buildKey(KeyBuilder.TYPE_AES, KeyBuilder.LENGTH_AES_128, false);
+            // CREATE OBJECTS FOR CBC CIPHERING
+            m_encryptSKCipher = Cipher.getInstance(Cipher.ALG_AES_BLOCK_128_ECB_NOPAD, false);
+            m_decryptSKCipher = Cipher.getInstance(Cipher.ALG_AES_BLOCK_128_ECB_NOPAD, false);
+            	   
             for(short i=0; i<DB_CNT; i++) 
  	    {
 		PINArray[i] = new OwnerPIN((byte) 3, PIN_LEN);
@@ -172,8 +201,11 @@ public class SimpleApplet extends javacard.framework.Applet
             if (apduBuffer[ISO7816.OFFSET_CLA] == CLA_SIMPLEAPPLET) {
                 switch ( apduBuffer[ISO7816.OFFSET_INS] )
                 {
+                    case INS_GENKEY: GenKey(apdu); break;     
                     case INS_SETKEY: SetKey(apdu); break;                    
-		    case INS_GETKEY: GetKey(apdu); break;                
+		    case INS_GETKEY: GetKey(apdu); break; 
+                    case INS_N_1: GetN_1(apdu); break; 
+                    case INS_N_B: GetN_B(apdu); break; 
                     default :
                         // The INS code is not supported by the dispatcher
                         ISOException.throwIt( ISO7816.SW_INS_NOT_SUPPORTED ) ;
@@ -210,6 +242,87 @@ public class SimpleApplet extends javacard.framework.Applet
         }
         
     }
+    
+    
+    void GenKey(APDU apdu)
+    {
+        byte[]    apdubuf = apdu.getBuffer();
+        byte[]    Temp = new byte[20];
+        byte[]    res = new byte[16];
+        short     dataLen = apdu.setIncomingAndReceive();
+        
+        //Doing HASH
+        //Calculating the HASH on above buffer
+        if (m_hash != null) {
+            m_hash.doFinal(apdubuf, ISO7816.OFFSET_CDATA, dataLen, Temp, (short) 0);
+        }
+        
+        Util.arrayCopyNonAtomic(Temp, (short) 0, LongKey, (short) 0,  (short) 16);
+
+        // SET KEY VALUE
+            m_aesLongKey.setKey(LongKey, (short) 0);
+
+            // INIT CIPHERS WITH NEW KEY
+            m_encryptCipher.init(m_aesLongKey, Cipher.MODE_ENCRYPT);
+            
+            byte[] ptdata = "123456789abcdefg".getBytes();
+
+            m_encryptCipher.doFinal(ptdata, (short) 0, (short) 16, res, (short) 0);
+            
+        
+            //System.out.println(res);
+    }
+    
+    void GetN_1(APDU apdu)
+    {
+        byte[]    apdubuf = apdu.getBuffer();
+        short     dataLen = apdu.setIncomingAndReceive();
+        byte[]    res = new byte[32];
+        byte[]    Temp = new byte[48];
+        
+        m_decryptCipher.init(m_aesLongKey, Cipher.MODE_DECRYPT);
+        
+        m_decryptCipher.doFinal(apdubuf, ISO7816.OFFSET_CDATA, dataLen, res, (short) 0);
+        
+        Util.arrayCopyNonAtomic(res, (short) 0, resN_1, (short) (0), (short) 16);
+        
+        
+        m_secureRandom.generateData(N_B, (byte)0, (byte) (16));
+
+        Util.arrayCopyNonAtomic(resN_1, (short) 0, Temp, (short) (0), (short) 16);
+        Util.arrayCopyNonAtomic(N_B, (short) 0, Temp, (short) (16), (short)N_B.length);
+        Util.arrayCopyNonAtomic("BBBBBBBBBBBBBBBB".getBytes(), (short) 0, Temp, (short) (16+16), (short)16);
+        
+        m_encryptCipher.init(m_aesLongKey, Cipher.MODE_ENCRYPT);
+
+        m_encryptCipher.doFinal(Temp, (short) 0, (short) 48, apdubuf, (short) ISO7816.OFFSET_CDATA);
+        
+        apdu.setOutgoingAndSend(ISO7816.OFFSET_CDATA, (byte)48);        
+    }
+    
+    void GetN_B(APDU apdu)
+    {
+        byte[]    apdubuf = apdu.getBuffer();
+        short     dataLen = apdu.setIncomingAndReceive();
+        byte[]    resN_B = new byte[dataLen];
+        //byte[]    Temp = new byte[48];
+        
+        m_decryptCipher.init(m_aesLongKey, Cipher.MODE_DECRYPT);
+        
+        m_decryptCipher.doFinal(apdubuf, ISO7816.OFFSET_CDATA, dataLen, resN_B, (short) 0);
+        
+        short i = Util.arrayCompare(N_B, (short)0, resN_B, (short)0, (short)dataLen);
+        
+        if(i == 0)
+        {
+            Util.arrayCopyNonAtomic(resN_1, (short) 0, SessionKey, (short) (0), (short) 16);
+            Util.arrayCopyNonAtomic(N_B, (short) 0, SessionKey, (short) (16), (short)16);            
+        }
+        else
+        {
+            ISOException.throwIt(SW_WRONG_N_B);
+        }
+    }
 
     // SET the KEY
     void SetKey(APDU apdu) 
@@ -220,6 +333,13 @@ public class SimpleApplet extends javacard.framework.Applet
       byte[]    RandomNumber = new byte[2*KEY_SIZE];
       m_secureRandom.generateData(RandomNumber, (byte)0, (byte) (2*KEY_SIZE));
       
+      // SET KEY VALUE
+      m_aesSessionKey.setKey(SessionKey, (short) 0);
+
+      // INIT CIPHERS WITH NEW KEY
+      m_encryptSKCipher.init(m_aesSessionKey, Cipher.MODE_ENCRYPT);
+            
+      m_encryptSKCipher.doFinal(RandomNumber, (short) 0, (short) (2*KEY_SIZE), RandomNumber, (short) 0);      
 
       KeyArray[NumKey].setKey(RandomNumber, (byte)0);  
       IVArray[NumKey].setKey(RandomNumber, KEY_SIZE);   
