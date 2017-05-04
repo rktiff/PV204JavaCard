@@ -19,17 +19,4 @@ along with Universal Password Manager; if not, write to the Free Software
 Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 
-
-   5-Dec-2005 : Version 1.0b1
-      First release.      This is primarily a bug fix release.
-
-      Bugs Fixed
-      [1551461] - Database sync problem on Mac
-
-      Other Changes
-      - Tidy up the HTTP proxy code in the HTTPTransport class
-      - Don't prompt the user for the password on each database sync
-      - Don't bother showing a "success" dialog on each database sync
-      - Don't bother asking the user to sync database on application exit
-      - Change the status bar message for local databases
     
