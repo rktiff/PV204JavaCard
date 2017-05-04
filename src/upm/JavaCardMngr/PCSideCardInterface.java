@@ -122,7 +122,7 @@ public class PCSideCardInterface {
     
     
         //System.arraycopy(password.toString().getBytes(), 0, additionalData, 0, password.length);
-        //System.arraycopy(salt, 0, additionalData, password.length, salt.length);
+        System.arraycopy(data, 0, additionalData, 0, data.length);
         
         try{
             byte[] result=null;
@@ -131,9 +131,14 @@ public class PCSideCardInterface {
             //if(response.length<2) throw new SmartUPMAppletException("Unexpected Applet Response.");
 
             //Applet response is at least 2 bytes, last 2 bytes are status word.
-
+            
             if(response.length>2){
                 result=new byte[response.length-2];
+                System.arraycopy(response,0,result,0,result.length);
+            }
+            else
+            {
+                result=new byte[response.length];
                 System.arraycopy(response,0,result,0,result.length);
             }
             byte status[]=new byte[2];

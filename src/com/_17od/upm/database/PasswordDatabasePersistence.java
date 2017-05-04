@@ -80,7 +80,7 @@ public class PasswordDatabasePersistence {
      * @param password
      * @throws CryptoException
      */
-    public PasswordDatabasePersistence(char[] password) throws CryptoException, InvalidPasswordException {
+    public PasswordDatabasePersistence(char[] password) throws CryptoException, InvalidPasswordException, Exception {
         encryptionService = new EncryptionService(password);
     }
 
@@ -176,7 +176,7 @@ public class PasswordDatabasePersistence {
         return passwordDatabase;
     }
 
-    public PasswordDatabase load(File databaseFile, char[] password) throws IOException, ProblemReadingDatabaseFile, InvalidPasswordException, CryptoException {
+    public PasswordDatabase load(File databaseFile, char[] password) throws IOException, ProblemReadingDatabaseFile, InvalidPasswordException, CryptoException, Exception {
 
         byte[] fullDatabase;
         fullDatabase = readFile(databaseFile);

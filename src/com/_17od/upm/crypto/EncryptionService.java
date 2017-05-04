@@ -62,9 +62,9 @@ private static final String randomAlgorithm = "SHA1PRNG";
     public static final short IVLengthAES = 16;
 
     private byte[] FileHandle;
-    private byte[] KeyFromCard;
+    private byte[] KeyFromCard = new byte[48+1];
     private byte[] ResponseFromCard;
-    private byte[] SessionKey;
+    
     private BufferedBlockCipher encryptCipher;
     private BufferedBlockCipher decryptCipher;
     
@@ -74,6 +74,7 @@ private static final String randomAlgorithm = "SHA1PRNG";
     byte[] N_B = new byte [16];
     
     SecretKeySpec secretKeySpec;
+    SecretKeySpec sessionKeySpec;
     
     Cipher cipher;
     Cipher SKcipher;
@@ -131,20 +132,26 @@ private static final String randomAlgorithm = "SHA1PRNG";
             
            cipher.init(Cipher.ENCRYPT_MODE, secretKeySpec);           
            
-           cipher.doFinal(N_B, 0, 16, res, 0);
+           byte[] res2 = new byte[16]; 
+
+           cipher.doFinal(N_B, 0, 16, res2, 0);
            
             //Send Ek(N_B") 
-           ResponseFromCard = InterFaceApplet.sendAppletInstructionSecureChannel(PCSideCardInterface.SEND_INS_N_B,(byte)0, (byte) 0, res);             
+           ResponseFromCard = InterFaceApplet.sendAppletInstructionSecureChannel(PCSideCardInterface.SEND_INS_N_B,(byte)0, (byte) 0, res2);             
            if(ResponseFromCard == null)
            {
                /*throw exception*/ 
                System.exit(0);
            }
-                   
-           System.arraycopy(N_1, 0, SessionKey, 0, 16);
-           System.arraycopy(N_B, 0, SessionKey, 16, 16);
+                 
+           byte[] SessionKey = new byte [16];
+           System.arraycopy(N_1, 0, res, 0, 16);
+           System.arraycopy(N_B, 0, res, 16, 16);
            
-           SecretKeySpec sessionKeySpec = new SecretKeySpec(SessionKey,"AES");
+           MessageDigest sha = MessageDigest.getInstance("SHA-1");        
+           SessionKey = Arrays.copyOf(sha.digest(res), 16);
+           
+           sessionKeySpec = new SecretKeySpec(SessionKey,"AES");
         
             SKcipher = Cipher.getInstance("AES/ECB/NOPADDING");//Can be seen for CBC
         
@@ -154,10 +161,14 @@ private static final String randomAlgorithm = "SHA1PRNG";
            {   
               FileHandle=InterFaceApplet.sendAppletInstruction(PCSideCardInterface.SEND_INS_SETKEY,(byte)0, (byte) 0, null , password); 
            }
-           byte[] KeyFromCard1;
-           KeyFromCard1=InterFaceApplet.sendAppletInstruction(PCSideCardInterface.SEND_INS_GETKEY,(byte)0, (byte) 0, FileHandle, password);    
+           //byte[] KeyFromCard1;
+           byte[] KeyFromCard1=InterFaceApplet.sendAppletInstruction(PCSideCardInterface.SEND_INS_GETKEY,(byte)0, (byte) 0, FileHandle, password);    
            
-           SKcipher.doFinal(KeyFromCard1, 0, KeyFromCard1.length, KeyFromCard, 0);
+           //KeyFromCard[0] = KeyFromCard1[0];
+           
+           System.arraycopy(KeyFromCard1, (short) 0, KeyFromCard, (short)0, (short)1);
+           
+           SKcipher.doFinal(KeyFromCard1, (short)1, (short)(KeyFromCard1.length-1), KeyFromCard, (short)1);
            
         }catch (InvalidPasswordException ex){
             throw ex;
